@@ -1,12 +1,19 @@
 #include <ctime>
+#include <iomanip>
+#include <sstream>
 #include <string>
 #include <nlohmann/json.hpp>
+#include <openssl/sha.h>
 
 #include "nostr.hpp"
 
 using nlohmann::json;
+using std::hex;
 using std::invalid_argument;
+using std::setw;
+using std::setfill;
 using std::string;
+using std::stringstream;
 using std::time;
 
 namespace nostr 
@@ -23,7 +30,6 @@ string Event::serialize()
     }
 
     json j = {
-        {"id", this->id},
         {"pubkey", this->pubkey},
         {"created_at", this->createdAt},
         {"kind", this->kind},
@@ -31,6 +37,11 @@ string Event::serialize()
         {"content", this->content},
         {"sig", this->sig}
     };
+
+    j["id"] = this->generateId(j.dump());
+
+    // TODO: Reach out to a signer to sign the event, then set the signature.
+
     return j.dump();
 };
 
@@ -48,12 +59,6 @@ void Event::deserialize(string jsonString)
 
 void Event::validate()
 {
-    bool hasId = this->id.length() > 0;
-    if (!hasId)
-    {
-        throw std::invalid_argument("Event::validate: The event id is required.");
-    }
-
     bool hasPubkey = this->pubkey.length() > 0;
     if (!hasPubkey)
     {
@@ -77,5 +82,22 @@ void Event::validate()
     {
         throw std::invalid_argument("Event::validate: The event must be signed.");
     }
+};
+
+string Event::generateId(string serializedData) const
+{
+    unsigned char hash[SHA256_DIGEST_LENGTH];
+    SHA256_CTX sha256;
+    SHA256_Init(&sha256);
+    SHA256_Update(&sha256, serializedData.c_str(), serializedData.length());
+    SHA256_Final(hash, &sha256);
+
+    stringstream ss;
+    for (int i = 0; i < SHA256_DIGEST_LENGTH; i++)
+    {
+        ss << hex << setw(2) << setfill('0') << (int)hash[i];
+    }
+
+    return ss.str();
 };
 } // namespace nostr

@@ -54,6 +54,15 @@ private:
      * @remark The `createdAt` field defaults to the present if it is not already set.
      */
     void validate();
+
+    /**
+     * @brief Generates an ID for the event.
+     * @param serializedData The serialized JSON string of all of the event data except the ID and
+     * the signature.
+     * @return A valid Nostr event ID.
+     * @remark The ID is a 32-bytes lowercase hex-encoded sha256 of the serialized event data.
+     */
+    std::string generateId(std::string serializedData) const;
 };
 
 /**
