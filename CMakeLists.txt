@@ -22,6 +22,7 @@ set(SOURCE_DIR ./src)
 set(CLIENT_SOURCE_DIR ./src/client)
 set(SOURCES
     ${SOURCE_DIR}/event.cpp
+    ${SOURCE_DIR}/filters.cpp
     ${SOURCE_DIR}/nostr_service.cpp
     ${CLIENT_SOURCE_DIR}/websocketpp_client.cpp
 )

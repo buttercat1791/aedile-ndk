@@ -15,6 +15,7 @@
 namespace nostr
 {
 typedef std::vector<std::string> RelayList;
+typedef std::unordered_map<std::string, std::vector<std::string>> TagMap;
 
 // TODO: Add null checking to seralization and deserialization methods.
 /**
@@ -51,6 +52,38 @@ private:
      * @brief Validates the event.
      * @throws `std::invalid_argument` if the event object is invalid.
      * @remark The `createdAt` field defaults to the present if it is not already set.
+     */
+    void validate();
+};
+
+/**
+ * @brief A set of filters for querying Nostr relays.
+ * @remark The `limit` field should always be included to keep the response size reasonable.  The
+ * `since` field is not required, and the `until` field will default to the present.  At least one
+ * of the other fields must be set for a valid filter.
+ */
+struct Filters
+{
+    std::vector<std::string> ids; ///< Event IDs.
+    std::vector<std::string> authors; ///< Event author npubs.
+    std::vector<int> kinds; ///< Kind numbers.
+    TagMap tags; ///< Tag names mapped to lists of tag values.
+    std::time_t since; ///< Unix timestamp.  Matching events must be newer than this.
+    std::time_t until; ///< Unix timestamp.  Matching events must be older than this.
+    int limit; ///< The maximum number of events the relay should return on the initial query.
+
+    /**
+     * @brief Serializes the filters to a JSON object.
+     * @returns A stringified JSON object representing the filters.
+     * @throws `std::invalid_argument` if the filter object is invalid.
+     */
+    std::string serialize();
+
+private:
+    /**
+     * @brief Validates the filters.
+     * @throws `std::invalid_argument` if the filter object is invalid.
+     * @remark The `until` field defaults to the present if it is not already set.
      */
     void validate();
 };
