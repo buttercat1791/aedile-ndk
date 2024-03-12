@@ -27,14 +27,32 @@ struct Event
 {
     std::string id; ///< SHA-256 hash of the event data.
     std::string pubkey; ///< Public key of the event creator.
-    std::string created_at; ///< Unix timestamp of the event creation.
+    std::time_t createdAt; ///< Unix timestamp of the event creation.
     int kind; ///< Event kind.
     std::vector<std::vector<std::string>> tags; ///< Arbitrary event metadata.
     std::string content; ///< Event content.
     std::string sig; ///< Event signature created with the private key of the event creator.
 
-    nlohmann::json serialize() const;
+    /**
+     * @brief Serializes the event to a JSON object.
+     * @returns A stringified JSON object representing the event.
+     * @throws `std::invalid_argument` if the event object is invalid.
+     */
+    std::string serialize();
+
+    /**
+     * @brief Deserializes the event from a JSON string.
+     * @param jsonString A stringified JSON object representing the event.
+     */
     void deserialize(std::string jsonString);
+
+private:
+    /**
+     * @brief Validates the event.
+     * @throws `std::invalid_argument` if the event object is invalid.
+     * @remark The `createdAt` field defaults to the present if it is not already set.
+     */
+    void validate();
 };
 
 class NostrService
