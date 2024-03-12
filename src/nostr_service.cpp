@@ -112,12 +112,12 @@ tuple<RelayList, RelayList> NostrService::publishEvent(Event event)
     PLOG_INFO << "Attempting to publish event to Nostr relays.";
 
     vector<future<tuple<string, bool>>> publishFutures;
-    for (string relay : this->_activeRelays)
+    for (const string& relay : this->_activeRelays)
     {
-        future<tuple<string, bool>> publishFuture = async([this, relay, event]() {
+        future<tuple<string, bool>> publishFuture = async([this, &relay, &event]() {
             return this->_client->send(event.serialize(), relay);
         });
-        
+
         publishFutures.push_back(move(publishFuture));
     }
 
