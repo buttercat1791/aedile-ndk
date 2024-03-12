@@ -39,6 +39,7 @@ C++ System Development Kit for Nostr
 ### Authentication and Security
 
 - [ ] Allow [HTTP Authentication](https://github.com/nostr-protocol/nips/blob/master/98.md) with servers.
+- [ ] Implement HTTP-only Nostr queries.
 
 ### Builds and Integrations
 
