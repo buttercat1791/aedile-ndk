@@ -35,11 +35,11 @@ string Filters::serialize()
     
     for (auto& tag : this->tags)
     {
-        stringstream jss;
-        jss << "#" << tag.first;
-        string js = jss.str();
+        stringstream ss;
+        ss << "#" << tag.first;
+        string tagname = ss.str();
 
-        j[js] = tag.second;
+        j[tagname] = tag.second;
     }
 
     return j.dump();
