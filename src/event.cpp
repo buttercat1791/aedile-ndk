@@ -1,9 +1,9 @@
 #include <ctime>
+#include <openssl/evp.h>
 #include <iomanip>
 #include <sstream>
 #include <string>
 #include <nlohmann/json.hpp>
-#include <openssl/sha.h>
 
 #include "nostr.hpp"
 
@@ -87,10 +87,7 @@ void Event::validate()
 string Event::generateId(string serializedData) const
 {
     unsigned char hash[SHA256_DIGEST_LENGTH];
-    SHA256_CTX sha256;
-    SHA256_Init(&sha256);
-    SHA256_Update(&sha256, serializedData.c_str(), serializedData.length());
-    SHA256_Final(hash, &sha256);
+    EVP_Digest(serializedData.c_str(), serializedData.length(), hash, NULL, EVP_sha256(), NULL);
 
     stringstream ss;
     for (int i = 0; i < SHA256_DIGEST_LENGTH; i++)
