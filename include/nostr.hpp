@@ -83,10 +83,13 @@ struct Filters
 
     /**
      * @brief Serializes the filters to a JSON object.
+     * @param subscriptionId A string up to 64 chars in length that is unique per relay connection.
      * @returns A stringified JSON object representing the filters.
      * @throws `std::invalid_argument` if the filter object is invalid.
+     * @remarks The Nostr client is responsible for managing subscription IDs.  Responses from the
+     * relay will be organized by subscription ID.
      */
-    std::string serialize();
+    std::string serialize(std::string subscriptionId);
 
 private:
     /**

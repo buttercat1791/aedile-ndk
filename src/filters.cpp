@@ -13,7 +13,7 @@ using std::time;
 
 namespace nostr
 {
-string Filters::serialize()
+string Filters::serialize(string subscriptionId)
 {
     try
     {
@@ -41,6 +41,8 @@ string Filters::serialize()
 
         j[tagname] = tag.second;
     }
+
+    json jarr = json::array({ "REQ", subscriptionId, j });
 
     return j.dump();
 };
