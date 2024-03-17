@@ -43,7 +43,9 @@ string Event::serialize()
 
     // TODO: Reach out to a signer to sign the event, then set the signature.
 
-    return j.dump();
+    json jarr = json::array({ "EVENT", j });
+
+    return jarr.dump();
 };
 
 void Event::deserialize(string jsonString)
