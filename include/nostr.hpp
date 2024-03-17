@@ -151,13 +151,28 @@ public:
     std::tuple<RelayList, RelayList> queryRelays(Filters filters);
 
     // TODO: Write a method that receives events for an active subscription.
-    // TODO: Write a method that closes active subscriptions.
+    
+    /**
+     * @brief Closes the subscription with the given ID on all open relay connections.
+     * @returns A tuple of `RelayList` objects, of the form `<successes, failures>`, indicating
+     * to which relays the message was sent successfully, and which relays failed to receive the
+     * message.
+     */
+    std::tuple<RelayList, RelayList> closeSubscription(std::string subscriptionId);
+
+    /**
+     * @brief Closes all open subscriptions on the given relays.
+     * @returns A tuple of `RelayList` objects, of the form `<successes, failures>`, indicating
+     * to which relays the message was sent successfully, and which relays failed to receive the
+     * message.
+     */
+    std::tuple<RelayList, RelayList> closeSubscriptions(RelayList relays);
 
 private:
     std::mutex _propertyMutex;
     RelayList _defaultRelays;
     RelayList _activeRelays;
-    std::unordered_map<std::string, std::vector<std::string>> _subscriptionIds;
+    std::unordered_map<std::string, std::vector<std::string>> _subscriptions;
     client::IWebSocketClient* _client;
 
     /**
@@ -198,5 +213,18 @@ private:
      * @returns A stringified UUID.
      */
     std::string generateSubscriptionId();
+
+    /**
+     * @brief Generates a message requesting a relay to close the subscription with the given ID.
+     * @returns A stringified JSON object representing the close request.
+     */
+    std::string generateCloseRequest(std::string subscriptionId);
+
+    /**
+     * @brief Indicates whether the connection to the given relay has a subscription with the given
+     * ID.
+     * @returns True if the relay has the subscription, false otherwise.
+     */
+    bool hasSubscription(std::string relay, std::string subscriptionId);
 };
 } // namespace nostr

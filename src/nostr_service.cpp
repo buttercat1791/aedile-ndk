@@ -1,6 +1,7 @@
 #include <boost/uuid/uuid.hpp>
 #include <boost/uuid/uuid_generators.hpp>
 #include <boost/uuid/uuid_io.hpp>
+#include <nlohmann/json.hpp>
 #include <plog/Init.h>
 #include <plog/Log.h>
 #include <websocketpp/client.hpp>
@@ -9,10 +10,11 @@
 #include "nostr.hpp"
 #include "client/web_socket_client.hpp"
 
-using std::async;
 using boost::uuids::random_generator;
 using boost::uuids::to_string;
 using boost::uuids::uuid;
+using nlohmann::json;
+using std::async;
 using std::future;
 using std::lock_guard;
 using std::make_tuple;
@@ -154,7 +156,7 @@ tuple<RelayList, RelayList> NostrService::queryRelays(Filters filters)
     for (const string relay : this->_activeRelays)
     {
         string subscriptionId = this->generateSubscriptionId();
-        this->_subscriptionIds[relay].push_back(subscriptionId);
+        this->_subscriptions[relay].push_back(subscriptionId);
         string request = filters.serialize(subscriptionId);
 
         future<tuple<string, bool>> requestFuture = async([this, &relay, &request]() {
@@ -178,7 +180,47 @@ tuple<RelayList, RelayList> NostrService::queryRelays(Filters filters)
 
     size_t targetCount = this->_activeRelays.size();
     size_t successfulCount = successfulRelays.size();
-    PLOG_INFO << "Published event to " << successfulCount << "/" << targetCount << " target relays.";
+    PLOG_INFO << "Sent query to " << successfulCount << "/" << targetCount << " open relay connections.";
+
+    return make_tuple(successfulRelays, failedRelays);
+};
+
+tuple<RelayList, RelayList> NostrService::closeSubscription(string subscriptionId)
+{
+    RelayList successfulRelays;
+    RelayList failedRelays;
+
+    vector<future<tuple<string, bool>>> closeFutures;
+    for (const string relay : this->_activeRelays)
+    {
+        if (!this->hasSubscription(relay, subscriptionId))
+        {
+            continue;
+        }
+
+        string request = this->generateCloseRequest(subscriptionId);
+        future<tuple<string, bool>> closeFuture = async([this, &relay, &request]() {
+            return this->_client->send(request, relay);
+        });
+        closeFutures.push_back(move(closeFuture));
+    }
+
+    for (auto& closeFuture : closeFutures)
+    {
+        auto [relay, isSuccess] = closeFuture.get();
+        if (isSuccess)
+        {
+            successfulRelays.push_back(relay);
+        }
+        else
+        {
+            failedRelays.push_back(relay);
+        }
+    }
+
+    size_t targetCount = this->_activeRelays.size();
+    size_t successfulCount = successfulRelays.size();
+    PLOG_INFO << "Sent close request to " << successfulCount << "/" << targetCount << " open relay connections.";
 
     return make_tuple(successfulRelays, failedRelays);
 };
@@ -292,5 +334,21 @@ string NostrService::generateSubscriptionId()
 {
     uuid uuid = random_generator()();
     return to_string(uuid);
+};
+
+string NostrService::generateCloseRequest(string subscriptionId)
+{
+    json jarr = json::array({ "CLOSE", subscriptionId });
+    return jarr.dump();
+};
+
+bool NostrService::hasSubscription(string relay, string subscriptionId)
+{
+    auto it = find(this->_subscriptions[relay].begin(), this->_subscriptions[relay].end(), subscriptionId);
+    if (it != this->_subscriptions[relay].end()) // If the subscription is in this->_subscriptions[relay]
+    {
+        return true;
+    }
+    return false;
 };
 } // namespace nostr
