@@ -142,12 +142,22 @@ public:
     */
     std::tuple<RelayList, RelayList> publishEvent(Event event);
 
-    // TODO: Add methods for reading events from relays.
+    /**
+     * @brief Queries all open relay connections for events matching the given set of filters.
+     * @returns A tuple of `RelayList` objects, of the form `<successes, failures>`, indicating
+     * to which relays the request was successfully sent, and which relays did not successfully
+     * receive the request.
+     */
+    std::tuple<RelayList, RelayList> queryRelays(Filters filters);
+
+    // TODO: Write a method that receives events for an active subscription.
+    // TODO: Write a method that closes active subscriptions.
 
 private:
     std::mutex _propertyMutex;
     RelayList _defaultRelays;
     RelayList _activeRelays;
+    std::unordered_map<std::string, std::vector<std::string>> _subscriptionIds;
     client::IWebSocketClient* _client;
 
     /**
@@ -182,5 +192,11 @@ private:
      * @brief Closes the connection from the client to the given relay.
      */
     void disconnect(std::string relay);
+
+    /**
+     * @brief Generates a unique subscription ID that may be used to identify event requests.
+     * @returns A stringified UUID.
+     */
+    std::string generateSubscriptionId();
 };
 } // namespace nostr

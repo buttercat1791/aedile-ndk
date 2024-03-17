@@ -1,3 +1,6 @@
+#include <boost/uuid/uuid.hpp>
+#include <boost/uuid/uuid_generators.hpp>
+#include <boost/uuid/uuid_io.hpp>
 #include <plog/Init.h>
 #include <plog/Log.h>
 #include <websocketpp/client.hpp>
@@ -7,6 +10,9 @@
 #include "client/web_socket_client.hpp"
 
 using std::async;
+using boost::uuids::random_generator;
+using boost::uuids::to_string;
+using boost::uuids::uuid;
 using std::future;
 using std::lock_guard;
 using std::make_tuple;
@@ -104,8 +110,6 @@ void NostrService::closeRelayConnections(RelayList relays)
 
 tuple<RelayList, RelayList> NostrService::publishEvent(Event event)
 {
-    // TODO: Add validation function.
-
     RelayList successfulRelays;
     RelayList failedRelays;
 
@@ -122,6 +126,44 @@ tuple<RelayList, RelayList> NostrService::publishEvent(Event event)
     }
 
     for (auto& publishFuture : publishFutures)
+    {
+        auto [relay, isSuccess] = publishFuture.get();
+        if (isSuccess)
+        {
+            successfulRelays.push_back(relay);
+        }
+        else
+        {
+            failedRelays.push_back(relay);
+        }
+    }
+
+    size_t targetCount = this->_activeRelays.size();
+    size_t successfulCount = successfulRelays.size();
+    PLOG_INFO << "Published event to " << successfulCount << "/" << targetCount << " target relays.";
+
+    return make_tuple(successfulRelays, failedRelays);
+};
+
+tuple<RelayList, RelayList> NostrService::queryRelays(Filters filters)
+{
+    RelayList successfulRelays;
+    RelayList failedRelays;
+
+    vector<future<tuple<string, bool>>> requestFutures;
+    for (const string relay : this->_activeRelays)
+    {
+        string subscriptionId = this->generateSubscriptionId();
+        this->_subscriptionIds[relay].push_back(subscriptionId);
+        string request = filters.serialize(subscriptionId);
+
+        future<tuple<string, bool>> requestFuture = async([this, &relay, &request]() {
+            return this->_client->send(request, relay);
+        });
+        requestFutures.push_back(move(requestFuture));
+    }
+
+    for (auto& publishFuture : requestFutures)
     {
         auto [relay, isSuccess] = publishFuture.get();
         if (isSuccess)
@@ -244,5 +286,11 @@ void NostrService::disconnect(string relay)
 
     lock_guard<mutex> lock(this->_propertyMutex);
     this->eraseActiveRelay(relay);
+};
+
+string NostrService::generateSubscriptionId()
+{
+    uuid uuid = random_generator()();
+    return to_string(uuid);
 };
 } // namespace nostr
