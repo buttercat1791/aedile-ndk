@@ -4,6 +4,7 @@
 #include <sstream>
 #include <string>
 #include <nlohmann/json.hpp>
+#include <sha.h>
 
 #include "nostr.hpp"
 
