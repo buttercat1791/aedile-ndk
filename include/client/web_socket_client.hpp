@@ -45,10 +45,10 @@ public:
     /**
      * @brief Sets up a message handler for the given server.
      * @param uri The URI of the server to which the message handler should be attached.
-     * @param messageHandler A callable object that will be invoked when the client receives a
-     * message from the server.
+     * @param messageHandler A callable object that will be invoked with the subscription ID and
+     * the message contents when the client receives a message from the server.
      */
-    virtual void receive(std::string uri, std::function<void(const std::string&)> messageHandler) = 0;
+    virtual void receive(std::string uri, std::function<void(const std::string&, const std::string&)> messageHandler) = 0;
 
     /**
      * @brief Closes the connection to the given server.

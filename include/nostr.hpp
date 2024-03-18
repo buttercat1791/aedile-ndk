@@ -1,5 +1,6 @@
 #pragma once
 
+#include <functional>
 #include <mutex>
 #include <string>
 #include <tuple>
@@ -144,13 +145,33 @@ public:
 
     /**
      * @brief Queries all open relay connections for events matching the given set of filters.
-     * @returns A tuple of `RelayList` objects, of the form `<successes, failures>`, indicating
-     * to which relays the request was successfully sent, and which relays did not successfully
-     * receive the request.
+     * @param filters The filters to use for the query.
+     * @returns The ID of the subscription created for the query.
      */
-    std::tuple<RelayList, RelayList> queryRelays(Filters filters);
+    std::string queryRelays(Filters filters);
 
-    // TODO: Write a method that receives events for an active subscription.
+    /**
+     * @brief Queries all open relay connections for events matching the given set of filters.
+     * @param filters The filters to use for the query.
+     * @param responseHandler A callable object that will be invoked each time the client receives
+     * an event matching the filters.
+     * @returns The ID of the subscription created for the query.
+     */
+    std::string queryRelays(Filters filters, std::function<void(std::string, Event)> responseHandler);
+
+    /**
+     * @brief Get any new events received since the last call to this method, across all
+     * subscriptions.
+     * @returns A pointer to a vector of new events.
+     */
+    std::unique_ptr<std::vector<Event>> getNewEvents();
+
+    /**
+     * @brief Get any new events received since the last call to this method, for the given
+     * subscription.
+     * @returns A pointer to a vector of new events.
+     */
+    std::unique_ptr<std::vector<Event>> getNewEvents(std::string subscriptionId);
     
     /**
      * @brief Closes the subscription with the given ID on all open relay connections.
@@ -177,11 +198,13 @@ public:
     std::tuple<RelayList, RelayList> closeSubscriptions(RelayList relays);
 
 private:
+    client::IWebSocketClient* _client;
     std::mutex _propertyMutex;
     RelayList _defaultRelays;
     RelayList _activeRelays;
     std::unordered_map<std::string, std::vector<std::string>> _subscriptions;
-    client::IWebSocketClient* _client;
+    std::unordered_map<std::string, std::vector<Event>> _events;
+    std::unordered_map<std::string, std::vector<Event>::iterator> _eventIterators;
 
     /**
      * @brief Determines which of the given relays are currently connected.
@@ -234,5 +257,14 @@ private:
      * @returns True if the relay has the subscription, false otherwise.
      */
     bool hasSubscription(std::string relay, std::string subscriptionId);
+
+    /**
+     * @brief A default message handler for events returned from relay queries.
+     * @param subscriptionId The ID of the subscription for which the event was received.
+     * @param event The event received from the relay.
+     * @remark By default, new events are stored in a map of subscription IDs to vectors of events.
+     * Events are retrieved by calling `getNewEvents` or `getNewEvents(subscriptionId)`.
+     */
+    void onEvent(std::string subscriptionId, Event event);
 };
 } // namespace nostr

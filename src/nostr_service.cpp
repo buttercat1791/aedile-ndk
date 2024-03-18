@@ -15,6 +15,7 @@ using boost::uuids::to_string;
 using boost::uuids::uuid;
 using nlohmann::json;
 using std::async;
+using std::function;
 using std::future;
 using std::lock_guard;
 using std::make_tuple;
@@ -147,15 +148,22 @@ tuple<RelayList, RelayList> NostrService::publishEvent(Event event)
     return make_tuple(successfulRelays, failedRelays);
 };
 
-tuple<RelayList, RelayList> NostrService::queryRelays(Filters filters)
+string NostrService::queryRelays(Filters filters)
+{
+    return this->queryRelays(filters, [this](string subscriptionId, Event event) {
+        this->onEvent(subscriptionId, event);
+    });
+};
+
+string NostrService::queryRelays(Filters filters, function<void(string, Event)> responseHandler)
 {
     RelayList successfulRelays;
     RelayList failedRelays;
 
+    string subscriptionId = this->generateSubscriptionId();
     vector<future<tuple<string, bool>>> requestFutures;
     for (const string relay : this->_activeRelays)
     {
-        string subscriptionId = this->generateSubscriptionId();
         this->_subscriptions[relay].push_back(subscriptionId);
         string request = filters.serialize(subscriptionId);
 
@@ -163,6 +171,12 @@ tuple<RelayList, RelayList> NostrService::queryRelays(Filters filters)
             return this->_client->send(request, relay);
         });
         requestFutures.push_back(move(requestFuture));
+
+        this->_client->receive(relay, [responseHandler](string subscriptionId, string message) {
+            Event event;
+            event.deserialize(message);
+            responseHandler(subscriptionId, event);
+        });
     }
 
     for (auto& publishFuture : requestFutures)
@@ -182,7 +196,7 @@ tuple<RelayList, RelayList> NostrService::queryRelays(Filters filters)
     size_t successfulCount = successfulRelays.size();
     PLOG_INFO << "Sent query to " << successfulCount << "/" << targetCount << " open relay connections.";
 
-    return make_tuple(successfulRelays, failedRelays);
+    return subscriptionId;
 };
 
 tuple<RelayList, RelayList> NostrService::closeSubscription(string subscriptionId)
@@ -393,5 +407,11 @@ bool NostrService::hasSubscription(string relay, string subscriptionId)
         return true;
     }
     return false;
+};
+
+void NostrService::onEvent(string subscriptionId, Event event)
+{
+    _events[subscriptionId].push_back(event);
+    PLOG_INFO << "Received event for subscription: " << subscriptionId;
 };
 } // namespace nostr
