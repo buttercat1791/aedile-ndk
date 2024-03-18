@@ -161,6 +161,14 @@ public:
     std::tuple<RelayList, RelayList> closeSubscription(std::string subscriptionId);
 
     /**
+     * @brief Closes all open subscriptions on all open relay connections.
+     * @returns A tuple of `RelayList` objects, of the form `<successes, failures>`, indicating
+     * to which relays the message was sent successfully, and which relays failed to receive the
+     * message.
+     */
+    std::tuple<RelayList, RelayList> closeSubscriptions();
+
+    /**
      * @brief Closes all open subscriptions on the given relays.
      * @returns A tuple of `RelayList` objects, of the form `<successes, failures>`, indicating
      * to which relays the message was sent successfully, and which relays failed to receive the

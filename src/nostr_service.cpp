@@ -225,6 +225,49 @@ tuple<RelayList, RelayList> NostrService::closeSubscription(string subscriptionI
     return make_tuple(successfulRelays, failedRelays);
 };
 
+tuple<RelayList, RelayList> NostrService::closeSubscriptions()
+{
+    return this->closeSubscriptions(this->_activeRelays);
+};
+
+tuple<RelayList, RelayList> NostrService::closeSubscriptions(RelayList relays)
+{
+    RelayList successfulRelays;
+    RelayList failedRelays;
+
+    vector<future<tuple<RelayList, RelayList>>> closeFutures;
+    for (const string relay : relays)
+    {
+        future<tuple<RelayList, RelayList>> closeFuture = async([this, &relay]() {
+            RelayList successfulRelays;
+            RelayList failedRelays;
+
+            for (const string& subscriptionId : this->_subscriptions[relay])
+            {
+                auto [successes, failures] = this->closeSubscription(subscriptionId);
+                successfulRelays.insert(successfulRelays.end(), successes.begin(), successes.end());
+                failedRelays.insert(failedRelays.end(), failures.begin(), failures.end());
+            }
+
+            return make_tuple(successfulRelays, failedRelays);
+        });
+        closeFutures.push_back(move(closeFuture));
+    }
+
+    for (auto& closeFuture : closeFutures)
+    {
+        auto [successes, failures] = closeFuture.get();
+        successfulRelays.insert(successfulRelays.end(), successes.begin(), successes.end());
+        failedRelays.insert(failedRelays.end(), failures.begin(), failures.end());
+    }
+
+    size_t targetCount = relays.size();
+    size_t successfulCount = successfulRelays.size();
+    PLOG_INFO << "Sent close requests to " << successfulCount << "/" << targetCount << " open relay connections.";
+
+    return make_tuple(successfulRelays, failedRelays);
+};
+
 RelayList NostrService::getConnectedRelays(RelayList relays)
 {
     PLOG_VERBOSE << "Identifying connected relays.";
