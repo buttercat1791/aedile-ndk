@@ -7,11 +7,13 @@
 #include <client/web_socket_client.hpp>
 #include <nostr.hpp>
 
+using std::function;
 using std::lock_guard;
 using std::make_shared;
 using std::mutex;
 using std::shared_ptr;
 using std::string;
+using std::tuple;
 using std::unordered_map;
 using ::testing::_;
 using ::testing::Invoke;
@@ -23,10 +25,11 @@ class MockWebSocketClient : public client::IWebSocketClient {
 public:
     MOCK_METHOD(void, start, (), (override));
     MOCK_METHOD(void, stop, (), (override));
-    MOCK_METHOD(void, openConnection, (std::string uri), (override));
-    MOCK_METHOD(bool, isConnected, (std::string uri), (override));
-    MOCK_METHOD((std::tuple<std::string, bool>), send, (std::string message, std::string uri), (override));
-    MOCK_METHOD(void, closeConnection, (std::string uri), (override));
+    MOCK_METHOD(void, openConnection, (string uri), (override));
+    MOCK_METHOD(bool, isConnected, (string uri), (override));
+    MOCK_METHOD((tuple<string, bool>), send, (string message, string uri), (override));
+    MOCK_METHOD(void, receive, (string uri, function<void(const string&)> messageHandler), (override));
+    MOCK_METHOD(void, closeConnection, (string uri), (override));
 };
 
 class NostrServiceTest : public testing::Test
