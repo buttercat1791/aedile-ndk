@@ -1,9 +1,12 @@
+#include <nlohmann/json.hpp>
 #include <websocketpp/client.hpp>
 #include <websocketpp/config/asio_client.hpp>
 
 #include "web_socket_client.hpp"
 
+using nlohmann::json;
 using std::error_code;
+using std::function;
 using std::lock_guard;
 using std::make_tuple;
 using std::mutex;
@@ -83,6 +86,29 @@ public:
         return make_tuple(uri, true);
     };
 
+    void receive(string uri, function<void(const string&, const string&)> messageHandler) override
+    {
+        this->_client.set_message_handler([this, messageHandler](
+            websocketpp::connection_hdl connectionHandle,
+            websocketpp_client::message_ptr message)
+        {
+            json jarr = json::array();
+            string payload = message->get_payload();
+
+            jarr.parse(payload);
+            string messageType = jarr[0];
+            
+            if (messageType == "EVENT")
+            {
+                string subscriptionId = jarr[1];
+                string messageContents = jarr[2].dump();
+                messageHandler(subscriptionId, messageContents);
+            };
+
+            // TODO: Add support for other message types.
+        });
+    };
+
     void closeConnection(string uri) override
     {
         lock_guard<mutex> lock(this->_propertyMutex);
@@ -103,5 +129,9 @@ private:
     websocketpp_client _client;
     unordered_map<string, websocketpp::connection_hdl> _connectionHandles;
     mutex _propertyMutex;
+
+    void onMessage(websocketpp::connection_hdl handle, websocketpp_client::message_ptr message)
+    {
+    };
 };
 } // namespace client
