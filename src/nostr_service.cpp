@@ -22,27 +22,33 @@ using std::make_tuple;
 using std::move;
 using std::mutex;
 using std::out_of_range;
+using std::shared_ptr;
 using std::string;
 using std::thread;
 using std::tuple;
+using std::unique_ptr;
 using std::vector;
 
 namespace nostr
 {
-NostrService::NostrService(plog::IAppender* appender, client::IWebSocketClient* client)
-    : NostrService(appender, client, {}) { };
+NostrService::NostrService(
+    shared_ptr<plog::IAppender> appender,
+    shared_ptr<client::IWebSocketClient> client)
+: NostrService(appender, client, {}) { };
 
-NostrService::NostrService(plog::IAppender* appender, client::IWebSocketClient* client, RelayList relays)
-    : _defaultRelays(relays), _client(client)
+NostrService::NostrService(
+    shared_ptr<plog::IAppender> appender,
+    shared_ptr<client::IWebSocketClient> client,
+    RelayList relays)
+: _defaultRelays(relays), _client(client)
 { 
-    plog::init(plog::debug, appender);
+    plog::init(plog::debug, appender.get());
     client->start();
 };
 
 NostrService::~NostrService()
 {
     this->_client->stop();
-    delete this->_client;
 };
 
 RelayList NostrService::defaultRelays() const { return this->_defaultRelays; };
@@ -152,6 +158,7 @@ tuple<RelayList, RelayList> NostrService::publishEvent(Event event)
 string NostrService::queryRelays(Filters filters)
 {
     return this->queryRelays(filters, [this](string subscriptionId, Event event) {
+        lock_guard<mutex> lock(this->_propertyMutex);
         this->_eventIterators[subscriptionId] = this->_events[subscriptionId].begin();
         this->onEvent(subscriptionId, event);
     });
@@ -166,6 +173,7 @@ string NostrService::queryRelays(Filters filters, function<void(string, Event)> 
     vector<future<tuple<string, bool>>> requestFutures;
     for (const string relay : this->_activeRelays)
     {
+        lock_guard<mutex> lock(this->_propertyMutex);
         this->_subscriptions[relay].push_back(subscriptionId);
         string request = filters.serialize(subscriptionId);
 
@@ -228,6 +236,7 @@ vector<Event> NostrService::getNewEvents(string subscriptionId)
         throw out_of_range("No event iterator found for subscription: " + subscriptionId);
     }
 
+    lock_guard<mutex> lock(this->_propertyMutex);
     vector<Event> newEvents;
     vector<Event> receivedEvents = this->_events[subscriptionId];
     vector<Event>::iterator eventIt = this->_eventIterators[subscriptionId];
@@ -453,6 +462,7 @@ bool NostrService::hasSubscription(string relay, string subscriptionId)
 
 void NostrService::onEvent(string subscriptionId, Event event)
 {
+    lock_guard<mutex> lock(this->_propertyMutex);
     _events[subscriptionId].push_back(event);
     PLOG_INFO << "Received event for subscription: " << subscriptionId;
 

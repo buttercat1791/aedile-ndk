@@ -56,12 +56,12 @@ TEST_F(NostrServiceTest, Constructor_StartsClient)
 {
     EXPECT_CALL(*testClient, start()).Times(1);
 
-    auto nostrService = new nostr::NostrService(testAppender.get(), testClient.get());
+    auto nostrService = new nostr::NostrService(testAppender, testClient);
 };
 
 TEST_F(NostrServiceTest, Constructor_InitializesService_WithNoDefaultRelays)
 {
-    auto nostrService = new nostr::NostrService(testAppender.get(), testClient.get());
+    auto nostrService = new nostr::NostrService(testAppender, testClient);
     auto defaultRelays = nostrService->defaultRelays();
     auto activeRelays = nostrService->activeRelays();
 
@@ -71,7 +71,7 @@ TEST_F(NostrServiceTest, Constructor_InitializesService_WithNoDefaultRelays)
 
 TEST_F(NostrServiceTest, Constructor_InitializesService_WithProvidedDefaultRelays)
 {
-    auto nostrService = new nostr::NostrService(testAppender.get(), testClient.get(), defaultTestRelays);
+    auto nostrService = new nostr::NostrService(testAppender, testClient, defaultTestRelays);
     auto defaultRelays = nostrService->defaultRelays();
     auto activeRelays = nostrService->activeRelays();
 
@@ -87,7 +87,7 @@ TEST_F(NostrServiceTest, Destructor_StopsClient)
 {
     EXPECT_CALL(*testClient, start()).Times(1);
 
-    auto nostrService = new nostr::NostrService(testAppender.get(), testClient.get());
+    auto nostrService = new nostr::NostrService(testAppender, testClient);
 };
 
 TEST_F(NostrServiceTest, OpenRelayConnections_OpensConnections_ToDefaultRelays)
@@ -112,7 +112,7 @@ TEST_F(NostrServiceTest, OpenRelayConnections_OpensConnections_ToDefaultRelays)
             return status;
         }));
     
-    auto nostrService = new nostr::NostrService(testAppender.get(), testClient.get(), defaultTestRelays);
+    auto nostrService = new nostr::NostrService(testAppender, testClient, defaultTestRelays);
     nostrService->openRelayConnections();
 
     auto activeRelays = nostrService->activeRelays();
@@ -147,7 +147,7 @@ TEST_F(NostrServiceTest, OpenRelayConnections_OpensConnections_ToProvidedRelays)
             return status;
         }));
 
-    auto nostrService = new nostr::NostrService(testAppender.get(), testClient.get(), defaultTestRelays);
+    auto nostrService = new nostr::NostrService(testAppender, testClient, defaultTestRelays);
     nostrService->openRelayConnections(testRelays);
 
     auto activeRelays = nostrService->activeRelays();
@@ -184,7 +184,7 @@ TEST_F(NostrServiceTest, OpenRelayConnections_AddsOpenConnections_ToActiveRelays
             return status;
         }));
 
-    auto nostrService = new nostr::NostrService(testAppender.get(), testClient.get(), defaultTestRelays);
+    auto nostrService = new nostr::NostrService(testAppender, testClient, defaultTestRelays);
     nostrService->openRelayConnections();
 
     auto activeRelays = nostrService->activeRelays();
@@ -227,7 +227,7 @@ TEST_F(NostrServiceTest, CloseRelayConnections_ClosesConnections_ToActiveRelays)
             return status;
         }));
 
-    auto nostrService = new nostr::NostrService(testAppender.get(), testClient.get(), defaultTestRelays);
+    auto nostrService = new nostr::NostrService(testAppender, testClient, defaultTestRelays);
     nostrService->openRelayConnections();
 
     EXPECT_CALL(*testClient, closeConnection(defaultTestRelays[0])).Times(1);
@@ -262,7 +262,7 @@ TEST_F(NostrServiceTest, CloseRelayConnections_RemovesClosedConnections_FromActi
             return status;
         }));
 
-    auto nostrService = new nostr::NostrService(testAppender.get(), testClient.get(), allTestRelays);
+    auto nostrService = new nostr::NostrService(testAppender, testClient, allTestRelays);
     nostrService->openRelayConnections();
 
     EXPECT_CALL(*testClient, closeConnection(testRelays[0])).Times(1);
@@ -300,7 +300,7 @@ TEST_F(NostrServiceTest, PublishEvent_CorrectlyIndicates_AllSuccesses)
             return status;
         }));
 
-    auto nostrService = new nostr::NostrService(testAppender.get(), testClient.get(), defaultTestRelays);
+    auto nostrService = new nostr::NostrService(testAppender, testClient, defaultTestRelays);
     nostrService->openRelayConnections();
 
     EXPECT_CALL(*testClient, send(_, _))
@@ -340,7 +340,7 @@ TEST_F(NostrServiceTest, PublishEvent_CorrectlyIndicates_AllFailures)
             return status;
         }));
 
-    auto nostrService = new nostr::NostrService(testAppender.get(), testClient.get(), defaultTestRelays);
+    auto nostrService = new nostr::NostrService(testAppender, testClient, defaultTestRelays);
     nostrService->openRelayConnections();
 
     EXPECT_CALL(*testClient, send(_, _))
@@ -380,7 +380,7 @@ TEST_F(NostrServiceTest, PublishEvent_CorrectlyIndicates_MixedSuccessesAndFailur
             return status;
         }));
 
-    auto nostrService = new nostr::NostrService(testAppender.get(), testClient.get(), defaultTestRelays);
+    auto nostrService = new nostr::NostrService(testAppender, testClient, defaultTestRelays);
     nostrService->openRelayConnections();
 
     EXPECT_CALL(*testClient, send(_, defaultTestRelays[0]))

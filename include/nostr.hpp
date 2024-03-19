@@ -104,8 +104,13 @@ private:
 class NostrService
 {
 public:
-    NostrService(plog::IAppender* appender, client::IWebSocketClient* client);
-    NostrService(plog::IAppender* appender, client::IWebSocketClient* client, RelayList relays);
+    NostrService(
+        std::shared_ptr<plog::IAppender> appender,
+        std::shared_ptr<client::IWebSocketClient> client);
+    NostrService(
+        std::shared_ptr<plog::IAppender> appender,
+        std::shared_ptr<client::IWebSocketClient> client,
+        RelayList relays);
     ~NostrService();
 
     RelayList defaultRelays() const;
@@ -207,7 +212,7 @@ private:
     const int MAX_EVENTS_PER_SUBSCRIPTION = 128;
 
     ///< The WebSocket client used to communicate with relays.
-    client::IWebSocketClient* _client;
+    shared_ptr<client::IWebSocketClient> _client;
     ///< A mutex to protect the instance properties.
     std::mutex _propertyMutex;
     ///< The default set of Nostr relays to which the service will attempt to connect.
