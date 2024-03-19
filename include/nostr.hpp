@@ -212,7 +212,7 @@ private:
     const int MAX_EVENTS_PER_SUBSCRIPTION = 128;
 
     ///< The WebSocket client used to communicate with relays.
-    shared_ptr<client::IWebSocketClient> _client;
+    std::shared_ptr<client::IWebSocketClient> _client;
     ///< A mutex to protect the instance properties.
     std::mutex _propertyMutex;
     ///< The default set of Nostr relays to which the service will attempt to connect.
