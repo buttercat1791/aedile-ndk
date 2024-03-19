@@ -18,7 +18,9 @@ namespace nostr
 typedef std::vector<std::string> RelayList;
 typedef std::unordered_map<std::string, std::vector<std::string>> TagMap;
 
-// TODO: Add null checking to seralization and deserialization methods.
+class ISigner;
+class NostrService;
+
 /**
  * @brief A Nostr event.
  * @remark All data transmitted over the Nostr protocol is encoded in JSON blobs.  This struct
@@ -40,7 +42,7 @@ struct Event
      * @returns A stringified JSON object representing the event.
      * @throws `std::invalid_argument` if the event object is invalid.
      */
-    std::string serialize();
+    std::string serialize(std::shared_ptr<ISigner> signer);
 
     /**
      * @brief Deserializes the event from a JSON string.
@@ -103,6 +105,7 @@ private:
 
 class NostrService
 {
+// TODO: Setup signer in the constructor.
 public:
     NostrService(
         std::shared_ptr<plog::IAppender> appender,
@@ -213,6 +216,9 @@ private:
 
     ///< The WebSocket client used to communicate with relays.
     std::shared_ptr<client::IWebSocketClient> _client;
+    ///< The signer used to sign Nostr events.
+    std::shared_ptr<ISigner> _signer;
+
     ///< A mutex to protect the instance properties.
     std::mutex _propertyMutex;
     ///< The default set of Nostr relays to which the service will attempt to connect.
@@ -286,5 +292,11 @@ private:
      * Events are retrieved by calling `getNewEvents` or `getNewEvents(subscriptionId)`.
      */
     void onEvent(std::string subscriptionId, Event event);
+};
+
+class ISigner
+{
+public:
+    virtual std::string generateSignature(std::shared_ptr<Event> event) = 0;
 };
 } // namespace nostr

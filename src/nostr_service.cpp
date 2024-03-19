@@ -129,7 +129,7 @@ tuple<RelayList, RelayList> NostrService::publishEvent(Event event)
     for (const string& relay : this->_activeRelays)
     {
         future<tuple<string, bool>> publishFuture = async([this, &relay, &event]() {
-            return this->_client->send(event.serialize(), relay);
+            return this->_client->send(event.serialize(this->_signer), relay);
         });
 
         publishFutures.push_back(move(publishFuture));

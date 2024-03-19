@@ -13,13 +13,14 @@ using std::hex;
 using std::invalid_argument;
 using std::setw;
 using std::setfill;
+using std::shared_ptr;
 using std::string;
 using std::stringstream;
 using std::time;
 
 namespace nostr 
 {
-string Event::serialize()
+string Event::serialize(shared_ptr<ISigner> signer)
 {
     try
     {
@@ -40,8 +41,7 @@ string Event::serialize()
     };
 
     j["id"] = this->generateId(j.dump());
-
-    // TODO: Reach out to a signer to sign the event, then set the signature.
+    j["sig"] = signer->generateSignature(shared_ptr<Event>(this));
 
     json jarr = json::array({ "EVENT", j });
 
