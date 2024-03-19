@@ -28,7 +28,7 @@ public:
     MOCK_METHOD(void, openConnection, (string uri), (override));
     MOCK_METHOD(bool, isConnected, (string uri), (override));
     MOCK_METHOD((tuple<string, bool>), send, (string message, string uri), (override));
-    MOCK_METHOD(void, receive, (string uri, function<void(const string&, const string&)> messageHandler), (override));
+    MOCK_METHOD(void, receive, (string uri, function<void(const string&)> messageHandler), (override));
     MOCK_METHOD(void, closeConnection, (string uri), (override));
 };
 

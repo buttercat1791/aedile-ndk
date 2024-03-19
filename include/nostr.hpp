@@ -170,7 +170,7 @@ public:
      * events returned from the relay for the given filters.  The service will not store the
      * events, and they will not be accessible via `getNewEvents`.
      */
-    std::string queryRelays(Filters filters, std::function<void(std::string, Event)> responseHandler);
+    std::string queryRelays(Filters filters, std::function<void(const std::string&, Event)> responseHandler);
 
     /**
      * @brief Get any new events received since the last call to this method, across all
@@ -283,6 +283,11 @@ private:
      * @returns True if the relay has the subscription, false otherwise.
      */
     bool hasSubscription(std::string relay, std::string subscriptionId);
+
+    /**
+     * @brief Parses messages received from the relay and invokes the appropriate message handler.
+     */
+    void onMessage(std::string message, std::function<void(const std::string&, Event)> eventHandler);
 
     /**
      * @brief A default message handler for events returned from relay queries.

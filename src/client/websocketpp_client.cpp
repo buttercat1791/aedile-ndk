@@ -1,10 +1,8 @@
-#include <nlohmann/json.hpp>
 #include <websocketpp/client.hpp>
 #include <websocketpp/config/asio_client.hpp>
 
 #include "web_socket_client.hpp"
 
-using nlohmann::json;
 using std::error_code;
 using std::function;
 using std::lock_guard;
@@ -86,26 +84,17 @@ public:
         return make_tuple(uri, true);
     };
 
-    void receive(string uri, function<void(const string&, const string&)> messageHandler) override
+    void receive(string uri, function<void(const string&)> messageHandler) override
     {
-        this->_client.set_message_handler([this, messageHandler](
+        lock_guard<mutex> lock(this->_propertyMutex);
+        auto connectionHandle = this->_connectionHandles[uri];
+        auto connection = this->_client.get_con_from_hdl(connectionHandle);
+
+        connection->set_message_handler([messageHandler](
             websocketpp::connection_hdl connectionHandle,
             websocketpp_client::message_ptr message)
         {
-            json jarr = json::array();
-            string payload = message->get_payload();
-
-            jarr.parse(payload);
-            string messageType = jarr[0];
-            
-            if (messageType == "EVENT")
-            {
-                string subscriptionId = jarr[1];
-                string messageContents = jarr[2].dump();
-                messageHandler(subscriptionId, messageContents);
-            };
-
-            // TODO: Add support for other message types.
+            messageHandler(message->get_payload());
         });
     };
 

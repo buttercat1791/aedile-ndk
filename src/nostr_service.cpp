@@ -164,7 +164,7 @@ string NostrService::queryRelays(Filters filters)
     });
 };
 
-string NostrService::queryRelays(Filters filters, function<void(string, Event)> responseHandler)
+string NostrService::queryRelays(Filters filters, function<void(const string&, Event)> responseHandler)
 {
     RelayList successfulRelays;
     RelayList failedRelays;
@@ -182,10 +182,8 @@ string NostrService::queryRelays(Filters filters, function<void(string, Event)> 
         });
         requestFutures.push_back(move(requestFuture));
 
-        this->_client->receive(relay, [responseHandler](string subscriptionId, string message) {
-            Event event;
-            event.deserialize(message);
-            responseHandler(subscriptionId, event);
+        this->_client->receive(relay, [this, responseHandler](string payload) {
+            this->onMessage(payload, responseHandler);
         });
     }
 
@@ -458,6 +456,25 @@ bool NostrService::hasSubscription(string relay, string subscriptionId)
         return true;
     }
     return false;
+};
+
+void NostrService::onMessage(string message, function<void(const string&, Event)> eventHandler)
+{
+    json jarr = json::array();
+    jarr = json::parse(message);
+
+    string messageType = jarr[0];
+
+    if (messageType == "EVENT")
+    {
+        string subscriptionId = jarr[1];
+        string serializedEvent = jarr[2].dump();
+        Event event;
+        event.deserialize(message);
+        eventHandler(subscriptionId, event);
+    }
+
+    // Support other message types here, if necessary.
 };
 
 void NostrService::onEvent(string subscriptionId, Event event)
