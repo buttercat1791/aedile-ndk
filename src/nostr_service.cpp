@@ -21,6 +21,7 @@ using std::lock_guard;
 using std::make_tuple;
 using std::move;
 using std::mutex;
+using std::out_of_range;
 using std::string;
 using std::thread;
 using std::tuple;
@@ -151,6 +152,7 @@ tuple<RelayList, RelayList> NostrService::publishEvent(Event event)
 string NostrService::queryRelays(Filters filters)
 {
     return this->queryRelays(filters, [this](string subscriptionId, Event event) {
+        this->_eventIterators[subscriptionId] = this->_events[subscriptionId].begin();
         this->onEvent(subscriptionId, event);
     });
 };
@@ -197,6 +199,46 @@ string NostrService::queryRelays(Filters filters, function<void(string, Event)> 
     PLOG_INFO << "Sent query to " << successfulCount << "/" << targetCount << " open relay connections.";
 
     return subscriptionId;
+};
+
+vector<Event> NostrService::getNewEvents()
+{
+    vector<Event> newEvents;
+
+    for (auto& [subscriptionId, events] : this->_events)
+    {
+        vector<Event> subscriptionEvents = this->getNewEvents(subscriptionId);
+        newEvents.insert(newEvents.end(), subscriptionEvents.begin(), subscriptionEvents.end());
+    }
+
+    return newEvents;
+};
+
+vector<Event> NostrService::getNewEvents(string subscriptionId)
+{
+    if (this->_events.find(subscriptionId) == this->_events.end())
+    {
+        PLOG_ERROR << "No events found for subscription: " << subscriptionId;
+        throw out_of_range("No events found for subscription: " + subscriptionId);
+    }
+
+    if (this->_eventIterators.find(subscriptionId) == this->_eventIterators.end())
+    {
+        PLOG_ERROR << "No event iterator found for subscription: " << subscriptionId;
+        throw out_of_range("No event iterator found for subscription: " + subscriptionId);
+    }
+
+    vector<Event> newEvents;
+    vector<Event> receivedEvents = this->_events[subscriptionId];
+    vector<Event>::iterator eventIt = this->_eventIterators[subscriptionId];
+
+    while (eventIt != receivedEvents.end())
+    {
+        newEvents.push_back(move(*eventIt));
+        eventIt++;
+    }
+
+    return newEvents;
 };
 
 tuple<RelayList, RelayList> NostrService::closeSubscription(string subscriptionId)
@@ -413,5 +455,19 @@ void NostrService::onEvent(string subscriptionId, Event event)
 {
     _events[subscriptionId].push_back(event);
     PLOG_INFO << "Received event for subscription: " << subscriptionId;
+
+    // To protect memory, only keep a limited number of events per subscription.
+    while (_events[subscriptionId].size() > NostrService::MAX_EVENTS_PER_SUBSCRIPTION)
+    {
+        auto startIt = _events[subscriptionId].begin();
+        auto eventIt = _eventIterators[subscriptionId];
+
+        if (eventIt == startIt)
+        {
+            eventIt++;
+        }
+
+        _events[subscriptionId].erase(_events[subscriptionId].begin());
+    }
 };
 } // namespace nostr

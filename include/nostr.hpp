@@ -147,6 +147,8 @@ public:
      * @brief Queries all open relay connections for events matching the given set of filters.
      * @param filters The filters to use for the query.
      * @returns The ID of the subscription created for the query.
+     * @remarks The service will store a limited number of events returned from the relay for the
+     * given filters.  These events may be retrieved via `getNewEvents`.
      */
     std::string queryRelays(Filters filters);
 
@@ -156,6 +158,9 @@ public:
      * @param responseHandler A callable object that will be invoked each time the client receives
      * an event matching the filters.
      * @returns The ID of the subscription created for the query.
+     * @remark By providing a response handler, the caller assumes responsibility for handling all
+     * events returned from the relay for the given filters.  The service will not store the
+     * events, and they will not be accessible via `getNewEvents`.
      */
     std::string queryRelays(Filters filters, std::function<void(std::string, Event)> responseHandler);
 
@@ -164,14 +169,14 @@ public:
      * subscriptions.
      * @returns A pointer to a vector of new events.
      */
-    std::unique_ptr<std::vector<Event>> getNewEvents();
+    std::vector<Event> getNewEvents();
 
     /**
      * @brief Get any new events received since the last call to this method, for the given
      * subscription.
      * @returns A pointer to a vector of new events.
      */
-    std::unique_ptr<std::vector<Event>> getNewEvents(std::string subscriptionId);
+    std::vector<Event> getNewEvents(std::string subscriptionId);
     
     /**
      * @brief Closes the subscription with the given ID on all open relay connections.
@@ -198,12 +203,22 @@ public:
     std::tuple<RelayList, RelayList> closeSubscriptions(RelayList relays);
 
 private:
+    ///< The maximum number of events the service will store for each subscription.
+    const int MAX_EVENTS_PER_SUBSCRIPTION = 128;
+
+    ///< The WebSocket client used to communicate with relays.
     client::IWebSocketClient* _client;
+    ///< A mutex to protect the instance properties.
     std::mutex _propertyMutex;
+    ///< The default set of Nostr relays to which the service will attempt to connect.
     RelayList _defaultRelays;
-    RelayList _activeRelays;
+    ///< The set of Nostr relays to which the service is currently connected.
+    RelayList _activeRelays; 
+    ///< A map from relay URIs to the subscription IDs open on each relay.
     std::unordered_map<std::string, std::vector<std::string>> _subscriptions;
+    ///< A map from subscription IDs to the events returned by the relays for each subscription.
     std::unordered_map<std::string, std::vector<Event>> _events;
+    ///< A map from the subscription IDs to the latest read event for each subscription.
     std::unordered_map<std::string, std::vector<Event>::iterator> _eventIterators;
 
     /**
