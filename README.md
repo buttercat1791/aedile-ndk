@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 # Aedile
 
 A Nostr System Development Kit written in C++.
@@ -43,3 +44,12 @@ To run unit tests, use the following command:
 ```bash
 ctest --preset linux
 ```
+
+### Build using Docker
+1. Build docker image:
+    docker build -t nostr-ubuntu -f Dockerfile
+
+2. Run docker image
+    docker run -it --privileged -u slavehost --hostname slavehost nostr-ubuntu bash
+
+
