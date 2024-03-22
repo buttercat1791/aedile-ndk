@@ -62,3 +62,5 @@ RUN mkdir build
 WORKDIR /home/slavehost/workspace/nostrsdk/build
 RUN cmake ..
 RUN make
+
+WORKDIR /home/slavehost
