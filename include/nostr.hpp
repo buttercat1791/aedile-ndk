@@ -42,7 +42,7 @@ struct Event
      * @returns A stringified JSON object representing the event.
      * @throws `std::invalid_argument` if the event object is invalid.
      */
-    std::string serialize(std::shared_ptr<ISigner> signer);
+    std::string serialize();
 
     /**
      * @brief Deserializes the event from a JSON string.
@@ -105,14 +105,15 @@ private:
 
 class NostrService
 {
-// TODO: Setup signer in the constructor.
 public:
     NostrService(
         std::shared_ptr<plog::IAppender> appender,
-        std::shared_ptr<client::IWebSocketClient> client);
+        std::shared_ptr<client::IWebSocketClient> client,
+        std::shared_ptr<ISigner> signer);
     NostrService(
         std::shared_ptr<plog::IAppender> appender,
         std::shared_ptr<client::IWebSocketClient> client,
+        std::shared_ptr<ISigner> signer,
         RelayList relays);
     ~NostrService();
 
@@ -149,7 +150,7 @@ public:
      * to which relays the event was published successfully, and to which relays the event failed
      * to publish.
     */
-    std::tuple<RelayList, RelayList> publishEvent(Event event);
+    std::tuple<RelayList, RelayList> publishEvent(std::shared_ptr<Event> event);
 
     /**
      * @brief Queries all open relay connections for events matching the given set of filters.
@@ -229,8 +230,8 @@ private:
     std::unordered_map<std::string, std::vector<std::string>> _subscriptions;
     ///< A map from subscription IDs to the events returned by the relays for each subscription.
     std::unordered_map<std::string, std::vector<Event>> _events;
-    ///< A map from the subscription IDs to the latest read event for each subscription.
-    std::unordered_map<std::string, std::vector<Event>::iterator> _eventIterators;
+    ///< A map from the subscription IDs to the ID of the latest read event for each subscription.
+    std::unordered_map<std::string, std::string> _lastRead;
 
     /**
      * @brief Determines which of the given relays are currently connected.
@@ -302,6 +303,11 @@ private:
 class ISigner
 {
 public:
-    virtual std::string generateSignature(std::shared_ptr<Event> event) = 0;
+    /**
+     * @brief Signs the given Nostr event.
+     * @param event The event to sign.
+     * @remark The event's `sig` field will be updated in-place with the signature.
+    */
+    virtual void sign(std::shared_ptr<Event> event) = 0;
 };
 } // namespace nostr

@@ -1,3 +1,4 @@
+#include <algorithm>
 #include <boost/uuid/uuid.hpp>
 #include <boost/uuid/uuid_generators.hpp>
 #include <boost/uuid/uuid_io.hpp>
@@ -15,6 +16,7 @@ using boost::uuids::to_string;
 using boost::uuids::uuid;
 using nlohmann::json;
 using std::async;
+using std::find_if;
 using std::function;
 using std::future;
 using std::lock_guard;
@@ -33,14 +35,16 @@ namespace nostr
 {
 NostrService::NostrService(
     shared_ptr<plog::IAppender> appender,
-    shared_ptr<client::IWebSocketClient> client)
-: NostrService(appender, client, {}) { };
+    shared_ptr<client::IWebSocketClient> client,
+    shared_ptr<ISigner> signer)
+: NostrService(appender, client, signer, {}) { };
 
 NostrService::NostrService(
     shared_ptr<plog::IAppender> appender,
     shared_ptr<client::IWebSocketClient> client,
+    shared_ptr<ISigner> signer,
     RelayList relays)
-: _defaultRelays(relays), _client(client)
+: _defaultRelays(relays), _client(client), _signer(signer)
 { 
     plog::init(plog::debug, appender.get());
     client->start();
@@ -118,20 +122,33 @@ void NostrService::closeRelayConnections(RelayList relays)
     }
 };
 
-tuple<RelayList, RelayList> NostrService::publishEvent(Event event)
+tuple<RelayList, RelayList> NostrService::publishEvent(shared_ptr<Event> event)
 {
     RelayList successfulRelays;
     RelayList failedRelays;
 
     PLOG_INFO << "Attempting to publish event to Nostr relays.";
 
+    string serializedEvent;
+    try
+    {
+        this->_signer->sign(event);
+        serializedEvent = event->serialize();
+    }
+    catch (const std::invalid_argument& error)
+    {
+        PLOG_ERROR << "Failed to sign event: " << error.what();
+        throw error;
+    }
+
+    lock_guard<mutex> lock(this->_propertyMutex);
     vector<future<tuple<string, bool>>> publishFutures;
     for (const string& relay : this->_activeRelays)
     {
-        future<tuple<string, bool>> publishFuture = async([this, &relay, &event]() {
-            return this->_client->send(event.serialize(this->_signer), relay);
+        PLOG_INFO << "Entering lambda.";
+        future<tuple<string, bool>> publishFuture = async([this, relay, serializedEvent]() {
+            return this->_client->send(serializedEvent, relay);
         });
-
         publishFutures.push_back(move(publishFuture));
     }
 
@@ -159,7 +176,7 @@ string NostrService::queryRelays(Filters filters)
 {
     return this->queryRelays(filters, [this](string subscriptionId, Event event) {
         lock_guard<mutex> lock(this->_propertyMutex);
-        this->_eventIterators[subscriptionId] = this->_events[subscriptionId].begin();
+        this->_lastRead[subscriptionId] = event.id;
         this->onEvent(subscriptionId, event);
     });
 };
@@ -228,16 +245,21 @@ vector<Event> NostrService::getNewEvents(string subscriptionId)
         throw out_of_range("No events found for subscription: " + subscriptionId);
     }
 
-    if (this->_eventIterators.find(subscriptionId) == this->_eventIterators.end())
+    if (this->_lastRead.find(subscriptionId) == this->_lastRead.end())
     {
-        PLOG_ERROR << "No event iterator found for subscription: " << subscriptionId;
-        throw out_of_range("No event iterator found for subscription: " + subscriptionId);
+        PLOG_ERROR << "No last read event ID found for subscription: " << subscriptionId;
+        throw out_of_range("No last read event ID found for subscription: " + subscriptionId);
     }
 
     lock_guard<mutex> lock(this->_propertyMutex);
     vector<Event> newEvents;
     vector<Event> receivedEvents = this->_events[subscriptionId];
-    vector<Event>::iterator eventIt = this->_eventIterators[subscriptionId];
+    vector<Event>::iterator eventIt = find_if(
+        receivedEvents.begin(),
+        receivedEvents.end(), 
+        [this,subscriptionId](Event event) {
+            return event.id == this->_lastRead[subscriptionId];
+        }) + 1;
 
     while (eventIt != receivedEvents.end())
     {
@@ -480,20 +502,26 @@ void NostrService::onMessage(string message, function<void(const string&, Event)
 void NostrService::onEvent(string subscriptionId, Event event)
 {
     lock_guard<mutex> lock(this->_propertyMutex);
-    _events[subscriptionId].push_back(event);
+    this->_events[subscriptionId].push_back(event);
     PLOG_INFO << "Received event for subscription: " << subscriptionId;
 
     // To protect memory, only keep a limited number of events per subscription.
-    while (_events[subscriptionId].size() > NostrService::MAX_EVENTS_PER_SUBSCRIPTION)
+    while (this->_events[subscriptionId].size() > NostrService::MAX_EVENTS_PER_SUBSCRIPTION)
     {
-        auto startIt = _events[subscriptionId].begin();
-        auto eventIt = _eventIterators[subscriptionId];
+        auto events = this->_events[subscriptionId];
+        auto eventIt = find_if(
+            events.begin(),
+            events.end(),
+            [this, subscriptionId](Event event) {
+                return event.id == this->_lastRead[subscriptionId];
+            });
 
-        if (eventIt == startIt)
+        if (eventIt == events.begin())
         {
             eventIt++;
         }
 
+        this->_lastRead[subscriptionId] = eventIt->id;
         _events[subscriptionId].erase(_events[subscriptionId].begin());
     }
 };

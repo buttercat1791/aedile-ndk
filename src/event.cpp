@@ -11,6 +11,7 @@
 using nlohmann::json;
 using std::hex;
 using std::invalid_argument;
+using std::make_shared;
 using std::setw;
 using std::setfill;
 using std::shared_ptr;
@@ -20,7 +21,7 @@ using std::time;
 
 namespace nostr 
 {
-string Event::serialize(shared_ptr<ISigner> signer)
+string Event::serialize()
 {
     try
     {
@@ -41,7 +42,6 @@ string Event::serialize(shared_ptr<ISigner> signer)
     };
 
     j["id"] = this->generateId(j.dump());
-    j["sig"] = signer->generateSignature(shared_ptr<Event>(this));
 
     json jarr = json::array({ "EVENT", j });
 
@@ -80,8 +80,8 @@ void Event::validate()
         throw std::invalid_argument("Event::validate: A valid event kind is required.");
     }
 
-    bool hasSig = this->sig.length() > 0;
-    if (!hasSig)
+    bool hasSignature = this->sig.length() > 0;
+    if (!hasSignature)
     {
         throw std::invalid_argument("Event::validate: The event must be signed.");
     }

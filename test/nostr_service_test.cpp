@@ -10,6 +10,7 @@
 using std::function;
 using std::lock_guard;
 using std::make_shared;
+using std::make_unique;
 using std::mutex;
 using std::shared_ptr;
 using std::string;
@@ -32,6 +33,15 @@ public:
     MOCK_METHOD(void, closeConnection, (string uri), (override));
 };
 
+class FakeSigner : public nostr::ISigner 
+{
+public:
+    void sign(shared_ptr<nostr::Event> event) override
+    {
+        event->sig = "fake_signature";
+    }
+};
+
 class NostrServiceTest : public testing::Test
 {
 public:
@@ -41,27 +51,45 @@ public:
         "wss://nostr.thesamecat.io"
     };
 
+    static const nostr::Event getTestEvent()
+    {
+        nostr::Event event;
+        event.pubkey = "13tn5ccv2guflxgffq4aj0hw5x39pz70zcdrfd6vym887gry38zys28dask";
+        event.kind = 1;
+        event.tags =
+        {
+            { "e", "5c83da77af1dec6d7289834998ad7aafbd9e2191396d75ec3cc27f5a77226f36", "wss://nostr.example.com" },
+            { "p", "f7234bd4c1394dda46d09f35bd384dd30cc552ad5541990f98844fb06676e9ca" },
+            { "a", "30023:f7234bd4c1394dda46d09f35bd384dd30cc552ad5541990f98844fb06676e9ca:abcd", "wss://nostr.example.com" }
+        };
+        event.content = "Hello, World!";
+
+        return event;
+    };
+
 protected:
     shared_ptr<plog::ConsoleAppender<plog::TxtFormatter>> testAppender;
-    shared_ptr<MockWebSocketClient> testClient;
+    shared_ptr<MockWebSocketClient> mockClient;
+    shared_ptr<FakeSigner> fakeSigner;
 
     void SetUp() override
     {
         testAppender = make_shared<plog::ConsoleAppender<plog::TxtFormatter>>();
-        testClient = make_shared<MockWebSocketClient>();
+        mockClient = make_shared<MockWebSocketClient>();
+        fakeSigner = make_shared<FakeSigner>();
     };
 };
 
 TEST_F(NostrServiceTest, Constructor_StartsClient)
 {
-    EXPECT_CALL(*testClient, start()).Times(1);
+    EXPECT_CALL(*mockClient, start()).Times(1);
 
-    auto nostrService = new nostr::NostrService(testAppender, testClient);
+    auto nostrService = make_unique<nostr::NostrService>(testAppender, mockClient, fakeSigner);
 };
 
 TEST_F(NostrServiceTest, Constructor_InitializesService_WithNoDefaultRelays)
 {
-    auto nostrService = new nostr::NostrService(testAppender, testClient);
+    auto nostrService = make_unique<nostr::NostrService>(testAppender, mockClient, fakeSigner);
     auto defaultRelays = nostrService->defaultRelays();
     auto activeRelays = nostrService->activeRelays();
 
@@ -71,7 +99,7 @@ TEST_F(NostrServiceTest, Constructor_InitializesService_WithNoDefaultRelays)
 
 TEST_F(NostrServiceTest, Constructor_InitializesService_WithProvidedDefaultRelays)
 {
-    auto nostrService = new nostr::NostrService(testAppender, testClient, defaultTestRelays);
+    auto nostrService = make_unique<nostr::NostrService>(testAppender, mockClient, fakeSigner, defaultTestRelays);
     auto defaultRelays = nostrService->defaultRelays();
     auto activeRelays = nostrService->activeRelays();
 
@@ -85,9 +113,9 @@ TEST_F(NostrServiceTest, Constructor_InitializesService_WithProvidedDefaultRelay
 
 TEST_F(NostrServiceTest, Destructor_StopsClient)
 {
-    EXPECT_CALL(*testClient, start()).Times(1);
+    EXPECT_CALL(*mockClient, start()).Times(1);
 
-    auto nostrService = new nostr::NostrService(testAppender, testClient);
+    auto nostrService = make_unique<nostr::NostrService>(testAppender, mockClient, fakeSigner);
 };
 
 TEST_F(NostrServiceTest, OpenRelayConnections_OpensConnections_ToDefaultRelays)
@@ -97,10 +125,10 @@ TEST_F(NostrServiceTest, OpenRelayConnections_OpensConnections_ToDefaultRelays)
     connectionStatus->insert({ defaultTestRelays[0], false });
     connectionStatus->insert({ defaultTestRelays[1], false });
 
-    EXPECT_CALL(*testClient, openConnection(defaultTestRelays[0])).Times(1);
-    EXPECT_CALL(*testClient, openConnection(defaultTestRelays[1])).Times(1);
+    EXPECT_CALL(*mockClient, openConnection(defaultTestRelays[0])).Times(1);
+    EXPECT_CALL(*mockClient, openConnection(defaultTestRelays[1])).Times(1);
 
-    EXPECT_CALL(*testClient, isConnected(_))
+    EXPECT_CALL(*mockClient, isConnected(_))
         .WillRepeatedly(Invoke([connectionStatus, &connectionStatusMutex](string uri)
         {
             lock_guard<mutex> lock(connectionStatusMutex);
@@ -112,7 +140,7 @@ TEST_F(NostrServiceTest, OpenRelayConnections_OpensConnections_ToDefaultRelays)
             return status;
         }));
     
-    auto nostrService = new nostr::NostrService(testAppender, testClient, defaultTestRelays);
+    auto nostrService = make_unique<nostr::NostrService>(testAppender, mockClient, fakeSigner, defaultTestRelays);
     nostrService->openRelayConnections();
 
     auto activeRelays = nostrService->activeRelays();
@@ -131,11 +159,11 @@ TEST_F(NostrServiceTest, OpenRelayConnections_OpensConnections_ToProvidedRelays)
     auto connectionStatus = make_shared<unordered_map<string, bool>>();
     connectionStatus -> insert({ testRelays[0], false });
 
-    EXPECT_CALL(*testClient, openConnection(testRelays[0])).Times(1);
-    EXPECT_CALL(*testClient, openConnection(defaultTestRelays[0])).Times(0);
-    EXPECT_CALL(*testClient, openConnection(defaultTestRelays[1])).Times(0);
+    EXPECT_CALL(*mockClient, openConnection(testRelays[0])).Times(1);
+    EXPECT_CALL(*mockClient, openConnection(defaultTestRelays[0])).Times(0);
+    EXPECT_CALL(*mockClient, openConnection(defaultTestRelays[1])).Times(0);
 
-    EXPECT_CALL(*testClient, isConnected(_))
+    EXPECT_CALL(*mockClient, isConnected(_))
         .WillRepeatedly(Invoke([connectionStatus, &connectionStatusMutex](string uri)
         {
             lock_guard<mutex> lock(connectionStatusMutex);
@@ -147,7 +175,7 @@ TEST_F(NostrServiceTest, OpenRelayConnections_OpensConnections_ToProvidedRelays)
             return status;
         }));
 
-    auto nostrService = new nostr::NostrService(testAppender, testClient, defaultTestRelays);
+    auto nostrService = make_unique<nostr::NostrService>(testAppender, mockClient, fakeSigner, defaultTestRelays);
     nostrService->openRelayConnections(testRelays);
 
     auto activeRelays = nostrService->activeRelays();
@@ -168,11 +196,11 @@ TEST_F(NostrServiceTest, OpenRelayConnections_AddsOpenConnections_ToActiveRelays
     connectionStatus->insert({ defaultTestRelays[1], false });
     connectionStatus->insert({ testRelays[0], false });
 
-    EXPECT_CALL(*testClient, openConnection(defaultTestRelays[0])).Times(1);
-    EXPECT_CALL(*testClient, openConnection(defaultTestRelays[1])).Times(1);
-    EXPECT_CALL(*testClient, openConnection(testRelays[0])).Times(1);
+    EXPECT_CALL(*mockClient, openConnection(defaultTestRelays[0])).Times(1);
+    EXPECT_CALL(*mockClient, openConnection(defaultTestRelays[1])).Times(1);
+    EXPECT_CALL(*mockClient, openConnection(testRelays[0])).Times(1);
 
-    EXPECT_CALL(*testClient, isConnected(_))
+    EXPECT_CALL(*mockClient, isConnected(_))
         .WillRepeatedly(Invoke([connectionStatus, &connectionStatusMutex](string uri)
         {
             lock_guard<mutex> lock(connectionStatusMutex);
@@ -184,7 +212,7 @@ TEST_F(NostrServiceTest, OpenRelayConnections_AddsOpenConnections_ToActiveRelays
             return status;
         }));
 
-    auto nostrService = new nostr::NostrService(testAppender, testClient, defaultTestRelays);
+    auto nostrService = make_unique<nostr::NostrService>(testAppender, mockClient, fakeSigner, defaultTestRelays);
     nostrService->openRelayConnections();
 
     auto activeRelays = nostrService->activeRelays();
@@ -215,7 +243,7 @@ TEST_F(NostrServiceTest, CloseRelayConnections_ClosesConnections_ToActiveRelays)
     connectionStatus->insert({ defaultTestRelays[0], false });
     connectionStatus->insert({ defaultTestRelays[1], false });
 
-    EXPECT_CALL(*testClient, isConnected(_))
+    EXPECT_CALL(*mockClient, isConnected(_))
         .WillRepeatedly(Invoke([connectionStatus, &connectionStatusMutex](string uri)
         {
             lock_guard<mutex> lock(connectionStatusMutex);
@@ -227,11 +255,11 @@ TEST_F(NostrServiceTest, CloseRelayConnections_ClosesConnections_ToActiveRelays)
             return status;
         }));
 
-    auto nostrService = new nostr::NostrService(testAppender, testClient, defaultTestRelays);
+    auto nostrService = make_unique<nostr::NostrService>(testAppender, mockClient, fakeSigner, defaultTestRelays);
     nostrService->openRelayConnections();
 
-    EXPECT_CALL(*testClient, closeConnection(defaultTestRelays[0])).Times(1);
-    EXPECT_CALL(*testClient, closeConnection(defaultTestRelays[1])).Times(1);
+    EXPECT_CALL(*mockClient, closeConnection(defaultTestRelays[0])).Times(1);
+    EXPECT_CALL(*mockClient, closeConnection(defaultTestRelays[1])).Times(1);
 
     nostrService->closeRelayConnections();
 
@@ -250,7 +278,7 @@ TEST_F(NostrServiceTest, CloseRelayConnections_RemovesClosedConnections_FromActi
     connectionStatus->insert({ defaultTestRelays[1], false });
     connectionStatus->insert({ testRelays[0], false });
 
-    EXPECT_CALL(*testClient, isConnected(_))
+    EXPECT_CALL(*mockClient, isConnected(_))
         .WillRepeatedly(Invoke([connectionStatus, &connectionStatusMutex](string uri)
         {
             lock_guard<mutex> lock(connectionStatusMutex);
@@ -262,10 +290,10 @@ TEST_F(NostrServiceTest, CloseRelayConnections_RemovesClosedConnections_FromActi
             return status;
         }));
 
-    auto nostrService = new nostr::NostrService(testAppender, testClient, allTestRelays);
+    auto nostrService = make_unique<nostr::NostrService>(testAppender, mockClient, fakeSigner, allTestRelays);
     nostrService->openRelayConnections();
 
-    EXPECT_CALL(*testClient, closeConnection(testRelays[0])).Times(1);
+    EXPECT_CALL(*mockClient, closeConnection(testRelays[0])).Times(1);
 
     nostrService->closeRelayConnections(testRelays);
 
@@ -288,7 +316,7 @@ TEST_F(NostrServiceTest, PublishEvent_CorrectlyIndicates_AllSuccesses)
     connectionStatus->insert({ defaultTestRelays[0], false });
     connectionStatus->insert({ defaultTestRelays[1], false });
 
-    EXPECT_CALL(*testClient, isConnected(_))
+    EXPECT_CALL(*mockClient, isConnected(_))
         .WillRepeatedly(Invoke([connectionStatus, &connectionStatusMutex](string uri)
         {
             lock_guard<mutex> lock(connectionStatusMutex);
@@ -300,17 +328,18 @@ TEST_F(NostrServiceTest, PublishEvent_CorrectlyIndicates_AllSuccesses)
             return status;
         }));
 
-    auto nostrService = new nostr::NostrService(testAppender, testClient, defaultTestRelays);
+    auto nostrService = make_unique<nostr::NostrService>(testAppender, mockClient, fakeSigner, defaultTestRelays);
     nostrService->openRelayConnections();
 
-    EXPECT_CALL(*testClient, send(_, _))
+    EXPECT_CALL(*mockClient, send(_, _))
         .Times(2)
         .WillRepeatedly(Invoke([](string message, string uri)
         {
             return make_tuple(uri, true);
         }));
     
-    auto [successes, failures] = nostrService->publishEvent(nostr::Event());
+    auto testEvent = make_shared<nostr::Event>(getTestEvent());
+    auto [successes, failures] = nostrService->publishEvent(testEvent);
 
     ASSERT_EQ(successes.size(), defaultTestRelays.size());
     for (auto relay : successes)
@@ -328,7 +357,7 @@ TEST_F(NostrServiceTest, PublishEvent_CorrectlyIndicates_AllFailures)
     connectionStatus->insert({ defaultTestRelays[0], false });
     connectionStatus->insert({ defaultTestRelays[1], false });
 
-    EXPECT_CALL(*testClient, isConnected(_))
+    EXPECT_CALL(*mockClient, isConnected(_))
         .WillRepeatedly(Invoke([connectionStatus, &connectionStatusMutex](string uri)
         {
             lock_guard<mutex> lock(connectionStatusMutex);
@@ -340,17 +369,18 @@ TEST_F(NostrServiceTest, PublishEvent_CorrectlyIndicates_AllFailures)
             return status;
         }));
 
-    auto nostrService = new nostr::NostrService(testAppender, testClient, defaultTestRelays);
+    auto nostrService = make_unique<nostr::NostrService>(testAppender, mockClient, fakeSigner, defaultTestRelays);
     nostrService->openRelayConnections();
 
-    EXPECT_CALL(*testClient, send(_, _))
+    EXPECT_CALL(*mockClient, send(_, _))
         .Times(2)
         .WillRepeatedly(Invoke([](string message, string uri)
         {
             return make_tuple(uri, false);
         }));
     
-    auto [successes, failures] = nostrService->publishEvent(nostr::Event());
+    auto testEvent = make_shared<nostr::Event>(getTestEvent());
+    auto [successes, failures] = nostrService->publishEvent(testEvent);
 
     ASSERT_EQ(successes.size(), 0);
 
@@ -368,7 +398,7 @@ TEST_F(NostrServiceTest, PublishEvent_CorrectlyIndicates_MixedSuccessesAndFailur
     connectionStatus->insert({ defaultTestRelays[0], false });
     connectionStatus->insert({ defaultTestRelays[1], false });
 
-    EXPECT_CALL(*testClient, isConnected(_))
+    EXPECT_CALL(*mockClient, isConnected(_))
         .WillRepeatedly(Invoke([connectionStatus, &connectionStatusMutex](string uri)
         {
             lock_guard<mutex> lock(connectionStatusMutex);
@@ -380,23 +410,24 @@ TEST_F(NostrServiceTest, PublishEvent_CorrectlyIndicates_MixedSuccessesAndFailur
             return status;
         }));
 
-    auto nostrService = new nostr::NostrService(testAppender, testClient, defaultTestRelays);
+    auto nostrService = make_unique<nostr::NostrService>(testAppender, mockClient, fakeSigner, defaultTestRelays);
     nostrService->openRelayConnections();
 
-    EXPECT_CALL(*testClient, send(_, defaultTestRelays[0]))
+    EXPECT_CALL(*mockClient, send(_, defaultTestRelays[0]))
         .Times(1)
         .WillRepeatedly(Invoke([](string message, string uri)
         {
             return make_tuple(uri, true);
         }));
-    EXPECT_CALL(*testClient, send(_, defaultTestRelays[1]))
+    EXPECT_CALL(*mockClient, send(_, defaultTestRelays[1]))
         .Times(1)
         .WillRepeatedly(Invoke([](string message, string uri)
         {
             return make_tuple(uri, false);
         }));
     
-    auto [successes, failures] = nostrService->publishEvent(nostr::Event());
+    auto testEvent = make_shared<nostr::Event>(getTestEvent());
+    auto [successes, failures] = nostrService->publishEvent(testEvent);
 
     ASSERT_EQ(successes.size(), 1);
     ASSERT_EQ(successes[0], defaultTestRelays[0]);
