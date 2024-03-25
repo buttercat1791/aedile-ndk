@@ -48,16 +48,35 @@ string Event::serialize()
     return jarr.dump();
 };
 
-void Event::deserialize(string jsonString)
+Event Event::fromString(string jstr)
 {
-    json j = json::parse(jsonString);
-    this->id = j["id"];
-    this->pubkey = j["pubkey"];
-    this->createdAt = j["created_at"];
-    this->kind = j["kind"];
-    this->tags = j["tags"];
-    this->content = j["content"];
-    this->sig = j["sig"];
+    json j = json::parse(jstr);
+    Event event;
+
+    event.id = j["id"];
+    event.pubkey = j["pubkey"];
+    event.createdAt = j["created_at"];
+    event.kind = j["kind"];
+    event.tags = j["tags"];
+    event.content = j["content"];
+    event.sig = j["sig"];
+
+    return event;
+};
+
+Event Event::fromJson(json j)
+{
+    Event event;
+
+    event.id = j["id"];
+    event.pubkey = j["pubkey"];
+    event.createdAt = j["created_at"];
+    event.kind = j["kind"];
+    event.tags = j["tags"];
+    event.content = j["content"];
+    event.sig = j["sig"];
+
+    return event;
 };
 
 void Event::validate()

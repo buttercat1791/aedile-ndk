@@ -490,10 +490,8 @@ void NostrService::onMessage(string message, function<void(const string&, Event)
     if (messageType == "EVENT")
     {
         string subscriptionId = jarr[1];
-        string serializedEvent = jarr[2].dump();
-        Event event;
-        event.deserialize(message);
-        eventHandler(subscriptionId, event);
+        Event event = Event::fromJson(jarr[2]);
+        eventHandler(subscriptionId, make_shared<Event>(event));
     }
 
     // Support other message types here, if necessary.

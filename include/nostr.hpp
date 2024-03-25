@@ -47,8 +47,16 @@ struct Event
     /**
      * @brief Deserializes the event from a JSON string.
      * @param jsonString A stringified JSON object representing the event.
+     * @returns An event instance created from the JSON string.
      */
-    void deserialize(std::string jsonString);
+    static Event fromString(std::string jsonString);
+
+    /**
+     * @brief Deserializes the event from a JSON object.
+     * @param j A JSON object representing the event.
+     * @returns An event instance created from the JSON object.
+     */
+    static Event fromJson(nlohmann::json j);
 
 private:
     /**
