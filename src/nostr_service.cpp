@@ -20,6 +20,7 @@ using std::find_if;
 using std::function;
 using std::future;
 using std::lock_guard;
+using std::make_shared;
 using std::make_tuple;
 using std::move;
 using std::mutex;
@@ -172,16 +173,18 @@ tuple<RelayList, RelayList> NostrService::publishEvent(shared_ptr<Event> event)
     return make_tuple(successfulRelays, failedRelays);
 };
 
-string NostrService::queryRelays(Filters filters)
+string NostrService::queryRelays(shared_ptr<Filters> filters)
 {
-    return this->queryRelays(filters, [this](string subscriptionId, Event event) {
+    return this->queryRelays(filters, [this](string subscriptionId, shared_ptr<Event> event) {
         lock_guard<mutex> lock(this->_propertyMutex);
-        this->_lastRead[subscriptionId] = event.id;
+        this->_lastRead[subscriptionId] = event->id;
         this->onEvent(subscriptionId, event);
     });
 };
 
-string NostrService::queryRelays(Filters filters, function<void(const string&, Event)> responseHandler)
+string NostrService::queryRelays(
+    shared_ptr<Filters> filters,
+    function<void(const string&, shared_ptr<Event>)> responseHandler)
 {
     RelayList successfulRelays;
     RelayList failedRelays;
@@ -192,7 +195,7 @@ string NostrService::queryRelays(Filters filters, function<void(const string&, E
     {
         lock_guard<mutex> lock(this->_propertyMutex);
         this->_subscriptions[relay].push_back(subscriptionId);
-        string request = filters.serialize(subscriptionId);
+        string request = filters->serialize(subscriptionId);
 
         future<tuple<string, bool>> requestFuture = async([this, &relay, &request]() {
             return this->_client->send(request, relay);
@@ -224,20 +227,20 @@ string NostrService::queryRelays(Filters filters, function<void(const string&, E
     return subscriptionId;
 };
 
-vector<Event> NostrService::getNewEvents()
+vector<shared_ptr<Event>> NostrService::getNewEvents()
 {
-    vector<Event> newEvents;
+    vector<shared_ptr<Event>> newEvents;
 
     for (auto& [subscriptionId, events] : this->_events)
     {
-        vector<Event> subscriptionEvents = this->getNewEvents(subscriptionId);
+        vector<shared_ptr<Event>> subscriptionEvents = this->getNewEvents(subscriptionId);
         newEvents.insert(newEvents.end(), subscriptionEvents.begin(), subscriptionEvents.end());
     }
 
     return newEvents;
 };
 
-vector<Event> NostrService::getNewEvents(string subscriptionId)
+vector<shared_ptr<Event>> NostrService::getNewEvents(string subscriptionId)
 {
     if (this->_events.find(subscriptionId) == this->_events.end())
     {
@@ -252,13 +255,13 @@ vector<Event> NostrService::getNewEvents(string subscriptionId)
     }
 
     lock_guard<mutex> lock(this->_propertyMutex);
-    vector<Event> newEvents;
-    vector<Event> receivedEvents = this->_events[subscriptionId];
-    vector<Event>::iterator eventIt = find_if(
+    vector<shared_ptr<Event>> newEvents;
+    vector<shared_ptr<Event>> receivedEvents = this->_events[subscriptionId];
+    vector<shared_ptr<Event>>::iterator eventIt = find_if(
         receivedEvents.begin(),
         receivedEvents.end(), 
-        [this,subscriptionId](Event event) {
-            return event.id == this->_lastRead[subscriptionId];
+        [this,subscriptionId](shared_ptr<Event> event) {
+            return event->id == this->_lastRead[subscriptionId];
         }) + 1;
 
     while (eventIt != receivedEvents.end())
@@ -480,7 +483,9 @@ bool NostrService::hasSubscription(string relay, string subscriptionId)
     return false;
 };
 
-void NostrService::onMessage(string message, function<void(const string&, Event)> eventHandler)
+void NostrService::onMessage(
+    string message,
+    function<void(const string&, shared_ptr<Event>)> eventHandler)
 {
     json jarr = json::array();
     jarr = json::parse(message);
@@ -497,10 +502,10 @@ void NostrService::onMessage(string message, function<void(const string&, Event)
     // Support other message types here, if necessary.
 };
 
-void NostrService::onEvent(string subscriptionId, Event event)
+void NostrService::onEvent(string subscriptionId, shared_ptr<Event> event)
 {
     lock_guard<mutex> lock(this->_propertyMutex);
-    this->_events[subscriptionId].push_back(event);
+    this->_events[subscriptionId].push_back(move(event));
     PLOG_INFO << "Received event for subscription: " << subscriptionId;
 
     // To protect memory, only keep a limited number of events per subscription.
@@ -510,8 +515,8 @@ void NostrService::onEvent(string subscriptionId, Event event)
         auto eventIt = find_if(
             events.begin(),
             events.end(),
-            [this, subscriptionId](Event event) {
-                return event.id == this->_lastRead[subscriptionId];
+            [this, subscriptionId](shared_ptr<Event> event) {
+                return event->id == this->_lastRead[subscriptionId];
             });
 
         if (eventIt == events.begin())
@@ -519,7 +524,7 @@ void NostrService::onEvent(string subscriptionId, Event event)
             eventIt++;
         }
 
-        this->_lastRead[subscriptionId] = eventIt->id;
+        this->_lastRead[subscriptionId] = (*eventIt)->id;
         _events[subscriptionId].erase(_events[subscriptionId].begin());
     }
 };

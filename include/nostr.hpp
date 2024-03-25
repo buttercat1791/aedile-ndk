@@ -167,7 +167,7 @@ public:
      * @remarks The service will store a limited number of events returned from the relay for the
      * given filters.  These events may be retrieved via `getNewEvents`.
      */
-    std::string queryRelays(Filters filters);
+    std::string queryRelays(std::shared_ptr<Filters> filters);
 
     /**
      * @brief Queries all open relay connections for events matching the given set of filters.
@@ -179,21 +179,23 @@ public:
      * events returned from the relay for the given filters.  The service will not store the
      * events, and they will not be accessible via `getNewEvents`.
      */
-    std::string queryRelays(Filters filters, std::function<void(const std::string&, Event)> responseHandler);
+    std::string queryRelays(
+        std::shared_ptr<Filters> filters,
+        std::function<void(const std::string&, std::shared_ptr<Event>)> responseHandler);
 
     /**
      * @brief Get any new events received since the last call to this method, across all
      * subscriptions.
      * @returns A pointer to a vector of new events.
      */
-    std::vector<Event> getNewEvents();
+    std::vector<std::shared_ptr<Event>> getNewEvents();
 
     /**
      * @brief Get any new events received since the last call to this method, for the given
      * subscription.
      * @returns A pointer to a vector of new events.
      */
-    std::vector<Event> getNewEvents(std::string subscriptionId);
+    std::vector<std::shared_ptr<Event>> getNewEvents(std::string subscriptionId);
     
     /**
      * @brief Closes the subscription with the given ID on all open relay connections.
@@ -237,7 +239,7 @@ private:
     ///< A map from relay URIs to the subscription IDs open on each relay.
     std::unordered_map<std::string, std::vector<std::string>> _subscriptions;
     ///< A map from subscription IDs to the events returned by the relays for each subscription.
-    std::unordered_map<std::string, std::vector<Event>> _events;
+    std::unordered_map<std::string, std::vector<std::shared_ptr<Event>>> _events;
     ///< A map from the subscription IDs to the ID of the latest read event for each subscription.
     std::unordered_map<std::string, std::string> _lastRead;
 
@@ -296,7 +298,9 @@ private:
     /**
      * @brief Parses messages received from the relay and invokes the appropriate message handler.
      */
-    void onMessage(std::string message, std::function<void(const std::string&, Event)> eventHandler);
+    void onMessage(
+        std::string message,
+        std::function<void(const std::string&, std::shared_ptr<Event>)> eventHandler);
 
     /**
      * @brief A default message handler for events returned from relay queries.
@@ -305,7 +309,7 @@ private:
      * @remark By default, new events are stored in a map of subscription IDs to vectors of events.
      * Events are retrieved by calling `getNewEvents` or `getNewEvents(subscriptionId)`.
      */
-    void onEvent(std::string subscriptionId, Event event);
+    void onEvent(std::string subscriptionId, std::shared_ptr<Event> event);
 };
 
 class ISigner
