@@ -44,7 +44,7 @@ string Filters::serialize(string subscriptionId)
 
     json jarr = json::array({ "REQ", subscriptionId, j });
 
-    return j.dump();
+    return jarr.dump();
 };
 
 void Filters::validate()

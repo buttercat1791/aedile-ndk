@@ -43,25 +43,14 @@ string Event::serialize()
 
     j["id"] = this->generateId(j.dump());
 
-    json jarr = json::array({ "EVENT", j });
-
-    return jarr.dump();
+    return j.dump();
 };
 
 Event Event::fromString(string jstr)
 {
     json j = json::parse(jstr);
-    Event event;
 
-    event.id = j["id"];
-    event.pubkey = j["pubkey"];
-    event.createdAt = j["created_at"];
-    event.kind = j["kind"];
-    event.tags = j["tags"];
-    event.content = j["content"];
-    event.sig = j["sig"];
-
-    return event;
+    return Event::fromJson(j);
 };
 
 Event Event::fromJson(json j)
