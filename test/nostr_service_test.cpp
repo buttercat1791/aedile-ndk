@@ -543,7 +543,7 @@ TEST_F(NostrServiceTest, QueryRelays_UsesDefaultHandler_AndReturnsSubscriptionId
             {
                 *sentSubscriptionId = temp.substr(1, temp.size() - 2);
             }
-            
+
             return make_tuple(uri, true);
         }));
     EXPECT_CALL(*mockClient, receive(_, _))
@@ -556,6 +556,71 @@ TEST_F(NostrServiceTest, QueryRelays_UsesDefaultHandler_AndReturnsSubscriptionId
     auto filters = make_shared<nostr::Filters>(getTestFilters());
     auto receivedSubscriptionId = nostrService->queryRelays(filters);
 
-    EXPECT_STREQ(receivedSubscriptionId.c_str(), sentSubscriptionId->c_str());
+    ASSERT_STREQ(receivedSubscriptionId.c_str(), sentSubscriptionId->c_str());
+};
+
+TEST_F(NostrServiceTest, QueryRelays_UsesProvidedHandler_AndReturnsSubscriptionId)
+{
+    mutex connectionStatusMutex;
+    auto connectionStatus = make_shared<unordered_map<string, bool>>();
+    connectionStatus->insert({ defaultTestRelays[0], false });
+    connectionStatus->insert({ defaultTestRelays[1], false });
+
+    EXPECT_CALL(*mockClient, isConnected(_))
+        .WillRepeatedly(Invoke([connectionStatus, &connectionStatusMutex](string uri)
+        {
+            lock_guard<mutex> lock(connectionStatusMutex);
+            bool status = connectionStatus->at(uri);
+            if (status == false)
+            {
+                connectionStatus->at(uri) = true;
+            }
+            return status;
+        }));
+
+    auto nostrService = make_unique<nostr::NostrService>(
+        testAppender,
+        mockClient,
+        fakeSigner,
+        defaultTestRelays);
+    nostrService->openRelayConnections();
+
+    auto sentSubscriptionId = make_shared<string>();
+    EXPECT_CALL(*mockClient, send(_, _))
+        .Times(2)
+        .WillRepeatedly(Invoke([sentSubscriptionId](string message, string uri)
+        {
+            json jarr = json::array();
+            jarr = json::parse(message);
+
+            string temp = jarr[1].dump();
+            if (!temp.empty() && temp[0] == '\"' && temp[temp.size() - 1] == '\"')
+            {
+                *sentSubscriptionId = temp.substr(1, temp.size() - 2);
+            }
+
+            return make_tuple(uri, true);
+        }));
+    EXPECT_CALL(*mockClient, receive(_, _))
+        .Times(2)
+        .WillRepeatedly(Invoke([sentSubscriptionId](string _, function<void(const string&)> messageHandler)
+        {
+            messageHandler(getTestEventMessage(*sentSubscriptionId));
+        }));
+
+    auto filters = make_shared<nostr::Filters>(getTestFilters());
+    nostr::Event expectedEvent = getTestEvent();
+    auto receivedSubscriptionId = nostrService->queryRelays(
+        filters,
+        [expectedEvent](const string& subscriptionId, shared_ptr<nostr::Event> event)
+        {
+            ASSERT_STREQ(event->pubkey.c_str(), expectedEvent.pubkey.c_str());
+            ASSERT_EQ(event->kind, expectedEvent.kind);
+            ASSERT_EQ(event->tags.size(), expectedEvent.tags.size());
+            ASSERT_STREQ(event->content.c_str(), expectedEvent.content.c_str());
+            ASSERT_GT(event->sig.size(), 0);
+        });
+
+    ASSERT_STREQ(receivedSubscriptionId.c_str(), sentSubscriptionId->c_str());
 };
 } // namespace nostr_test
