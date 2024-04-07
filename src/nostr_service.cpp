@@ -179,14 +179,6 @@ tuple<RelayList, RelayList> NostrService::publishEvent(shared_ptr<Event> event)
     return make_tuple(successfulRelays, failedRelays);
 };
 
-string NostrService::queryRelays(shared_ptr<Filters> filters)
-{
-    return this->queryRelays(filters, [this](string subscriptionId, shared_ptr<Event> event) {
-        this->_lastRead[subscriptionId] = event->id;
-        this->onEvent(subscriptionId, event);
-    });
-};
-
 string NostrService::queryRelays(
     shared_ptr<Filters> filters,
     function<void(const string&, shared_ptr<Event>)> responseHandler)
@@ -240,52 +232,6 @@ string NostrService::queryRelays(
     PLOG_INFO << "Sent query to " << successfulCount << "/" << targetCount << " open relay connections.";
 
     return subscriptionId;
-};
-
-vector<shared_ptr<Event>> NostrService::getNewEvents()
-{
-    vector<shared_ptr<Event>> newEvents;
-
-    for (auto& [subscriptionId, events] : this->_events)
-    {
-        vector<shared_ptr<Event>> subscriptionEvents = this->getNewEvents(subscriptionId);
-        newEvents.insert(newEvents.end(), subscriptionEvents.begin(), subscriptionEvents.end());
-    }
-
-    return newEvents;
-};
-
-vector<shared_ptr<Event>> NostrService::getNewEvents(string subscriptionId)
-{
-    if (this->_events.find(subscriptionId) == this->_events.end())
-    {
-        PLOG_ERROR << "No events found for subscription: " << subscriptionId;
-        throw out_of_range("No events found for subscription: " + subscriptionId);
-    }
-
-    if (this->_lastRead.find(subscriptionId) == this->_lastRead.end())
-    {
-        PLOG_ERROR << "No last read event ID found for subscription: " << subscriptionId;
-        throw out_of_range("No last read event ID found for subscription: " + subscriptionId);
-    }
-
-    lock_guard<mutex> lock(this->_propertyMutex);
-    vector<shared_ptr<Event>> newEvents;
-    vector<shared_ptr<Event>> receivedEvents = this->_events[subscriptionId];
-    vector<shared_ptr<Event>>::iterator eventIt = find_if(
-        receivedEvents.begin(),
-        receivedEvents.end(), 
-        [this,subscriptionId](shared_ptr<Event> event) {
-            return event->id == this->_lastRead[subscriptionId];
-        }) + 1;
-
-    while (eventIt != receivedEvents.end())
-    {
-        newEvents.push_back(move(*eventIt));
-        eventIt++;
-    }
-
-    return newEvents;
 };
 
 tuple<RelayList, RelayList> NostrService::closeSubscription(string subscriptionId)
@@ -521,33 +467,6 @@ void NostrService::onMessage(
     {
         PLOG_ERROR << "JSON handling exception: " << je.what();
         throw je;
-    }
-};
-
-void NostrService::onEvent(string subscriptionId, shared_ptr<Event> event)
-{
-    lock_guard<mutex> lock(this->_propertyMutex);
-    this->_events[subscriptionId].push_back(move(event));
-    PLOG_INFO << "Received event for subscription: " << subscriptionId;
-
-    // To protect memory, only keep a limited number of events per subscription.
-    while (this->_events[subscriptionId].size() > NostrService::MAX_EVENTS_PER_SUBSCRIPTION)
-    {
-        auto events = this->_events[subscriptionId];
-        auto eventIt = find_if(
-            events.begin(),
-            events.end(),
-            [this, subscriptionId](shared_ptr<Event> event) {
-                return event->id == this->_lastRead[subscriptionId];
-            });
-
-        if (eventIt == events.begin())
-        {
-            eventIt++;
-        }
-
-        this->_lastRead[subscriptionId] = (*eventIt)->id;
-        _events[subscriptionId].erase(_events[subscriptionId].begin());
     }
 };
 } // namespace nostr

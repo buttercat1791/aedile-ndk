@@ -54,7 +54,7 @@ public:
         "wss://nostr.thesamecat.io"
     };
 
-    static const nostr::Event getTestEvent()
+    static const nostr::Event getTextNoteTestEvent()
     {
         nostr::Event event;
         event.pubkey = "13tn5ccv2guflxgffq4aj0hw5x39pz70zcdrfd6vym887gry38zys28dask";
@@ -70,10 +70,24 @@ public:
         return event;
     };
 
-    static const string getTestEventMessage(string subscriptionId)
+    static const nostr::Event getLongFormTestEvent()
     {
-        auto event = make_shared<nostr::Event>(getTestEvent());
-        
+        nostr::Event event;
+        event.pubkey = "13tn5ccv2guflxgffq4aj0hw5x39pz70zcdrfd6vym887gry38zys28dask";
+        event.kind = 30023;
+        event.tags =
+        {
+            { "event", "5c83da77af1dec6d7289834998ad7aafbd9e2191396d75ec3cc27f5a77226f36", "wss://nostr.example.com" },
+            { "pubkey", "f7234bd4c1394dda46d09f35bd384dd30cc552ad5541990f98844fb06676e9ca" },
+            { "author", "30023:f7234bd4c1394dda46d09f35bd384dd30cc552ad5541990f98844fb06676e9ca:abcd", "wss://nostr.example.com" }
+        };
+        event.content = "Hello, World!";
+
+        return event;
+    }
+
+    static const string getTestEventMessage(shared_ptr<nostr::Event> event, string subscriptionId)
+    {        
         auto signer = make_unique<FakeSigner>();
         signer->sign(event);
 
@@ -85,7 +99,7 @@ public:
         return jarr.dump();
     }
 
-    static const nostr::Filters getTestFilters()
+    static const nostr::Filters getKind0And1TestFilters()
     {
         nostr::Filters filters;
         filters.authors = {
@@ -95,6 +109,20 @@ public:
         };
         filters.kinds = { 0, 1 };
         filters.limit = 10;
+
+        return filters;
+    }
+
+    static const nostr::Filters getKind30023TestFilters()
+    {
+        nostr::Filters filters;
+        filters.authors = {
+            "13tn5ccv2guflxgffq4aj0hw5x39pz70zcdrfd6vym887gry38zys28dask", 
+            "1l9d9jh67rkwayalrxcy686aujyz5pper5kzjv8jvg8pu9v9ns4ls0xvq42",
+            "187ujhtmnv82ftg03h4heetwk3dd9mlfkf8th3fvmrk20nxk9mansuzuyla"
+        };
+        filters.kinds = { 30023 };
+        filters.limit = 5;
 
         return filters;
     }
@@ -398,7 +426,7 @@ TEST_F(NostrServiceTest, PublishEvent_CorrectlyIndicates_AllSuccesses)
             return make_tuple(uri, true);
         }));
     
-    auto testEvent = make_shared<nostr::Event>(getTestEvent());
+    auto testEvent = make_shared<nostr::Event>(getTextNoteTestEvent());
     auto [successes, failures] = nostrService->publishEvent(testEvent);
 
     ASSERT_EQ(successes.size(), defaultTestRelays.size());
@@ -443,7 +471,7 @@ TEST_F(NostrServiceTest, PublishEvent_CorrectlyIndicates_AllFailures)
             return make_tuple(uri, false);
         }));
     
-    auto testEvent = make_shared<nostr::Event>(getTestEvent());
+    auto testEvent = make_shared<nostr::Event>(getTextNoteTestEvent());
     auto [successes, failures] = nostrService->publishEvent(testEvent);
 
     ASSERT_EQ(successes.size(), 0);
@@ -494,7 +522,7 @@ TEST_F(NostrServiceTest, PublishEvent_CorrectlyIndicates_MixedSuccessesAndFailur
             return make_tuple(uri, false);
         }));
     
-    auto testEvent = make_shared<nostr::Event>(getTestEvent());
+    auto testEvent = make_shared<nostr::Event>(getTextNoteTestEvent());
     auto [successes, failures] = nostrService->publishEvent(testEvent);
 
     ASSERT_EQ(successes.size(), 1);
@@ -502,61 +530,6 @@ TEST_F(NostrServiceTest, PublishEvent_CorrectlyIndicates_MixedSuccessesAndFailur
 
     ASSERT_EQ(failures.size(), 1);
     ASSERT_EQ(failures[0], defaultTestRelays[1]);
-};
-
-TEST_F(NostrServiceTest, QueryRelays_UsesDefaultHandler_AndReturnsSubscriptionId)
-{
-    mutex connectionStatusMutex;
-    auto connectionStatus = make_shared<unordered_map<string, bool>>();
-    connectionStatus->insert({ defaultTestRelays[0], false });
-    connectionStatus->insert({ defaultTestRelays[1], false });
-
-    EXPECT_CALL(*mockClient, isConnected(_))
-        .WillRepeatedly(Invoke([connectionStatus, &connectionStatusMutex](string uri)
-        {
-            lock_guard<mutex> lock(connectionStatusMutex);
-            bool status = connectionStatus->at(uri);
-            if (status == false)
-            {
-                connectionStatus->at(uri) = true;
-            }
-            return status;
-        }));
-
-    auto nostrService = make_unique<nostr::NostrService>(
-        testAppender,
-        mockClient,
-        fakeSigner,
-        defaultTestRelays);
-    nostrService->openRelayConnections();
-
-    auto sentSubscriptionId = make_shared<string>();
-    EXPECT_CALL(*mockClient, send(_, _))
-        .Times(2)
-        .WillRepeatedly(Invoke([sentSubscriptionId](string message, string uri)
-        {
-            json jarr = json::array();
-            jarr = json::parse(message);
-
-            string temp = jarr[1].dump();
-            if (!temp.empty() && temp[0] == '\"' && temp[temp.size() - 1] == '\"')
-            {
-                *sentSubscriptionId = temp.substr(1, temp.size() - 2);
-            }
-
-            return make_tuple(uri, true);
-        }));
-    EXPECT_CALL(*mockClient, receive(_, _))
-        .Times(2)
-        .WillRepeatedly(Invoke([sentSubscriptionId](string _, function<void(const string&)> messageHandler)
-        {
-            messageHandler(getTestEventMessage(*sentSubscriptionId));
-        }));
-
-    auto filters = make_shared<nostr::Filters>(getTestFilters());
-    auto receivedSubscriptionId = nostrService->queryRelays(filters);
-
-    ASSERT_STREQ(receivedSubscriptionId.c_str(), sentSubscriptionId->c_str());
 };
 
 TEST_F(NostrServiceTest, QueryRelays_UsesProvidedHandler_AndReturnsSubscriptionId)
@@ -605,11 +578,12 @@ TEST_F(NostrServiceTest, QueryRelays_UsesProvidedHandler_AndReturnsSubscriptionI
         .Times(2)
         .WillRepeatedly(Invoke([sentSubscriptionId](string _, function<void(const string&)> messageHandler)
         {
-            messageHandler(getTestEventMessage(*sentSubscriptionId));
+            auto event = make_shared<nostr::Event>(getTextNoteTestEvent());
+            messageHandler(getTestEventMessage(event, *sentSubscriptionId));
         }));
 
-    auto filters = make_shared<nostr::Filters>(getTestFilters());
-    nostr::Event expectedEvent = getTestEvent();
+    auto filters = make_shared<nostr::Filters>(getKind0And1TestFilters());
+    nostr::Event expectedEvent = getTextNoteTestEvent();
     auto receivedSubscriptionId = nostrService->queryRelays(
         filters,
         [expectedEvent](const string& subscriptionId, shared_ptr<nostr::Event> event)
