@@ -77,11 +77,17 @@ public:
 
         if (error.value() == -1)    
         {
-            // PLOG_ERROR << "Error publishing event to relay " << relay << ": " << error.message();
             return make_tuple(uri, false);
         }
 
         return make_tuple(uri, true);
+    };
+
+    tuple<string, bool> send(string message, string uri, function<void(const string&)> messageHandler) override
+    {
+        auto successes = this->send(message, uri);
+        this->receive(uri, messageHandler);
+        return successes;
     };
 
     void receive(string uri, function<void(const string&)> messageHandler) override

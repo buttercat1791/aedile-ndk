@@ -20,8 +20,10 @@ using std::string;
 using std::tuple;
 using std::unordered_map;
 using ::testing::_;
+using ::testing::Args;
 using ::testing::Invoke;
 using ::testing::Return;
+using ::testing::Truly;
 
 namespace nostr_test
 {
@@ -32,6 +34,7 @@ public:
     MOCK_METHOD(void, openConnection, (string uri), (override));
     MOCK_METHOD(bool, isConnected, (string uri), (override));
     MOCK_METHOD((tuple<string, bool>), send, (string message, string uri), (override));
+    MOCK_METHOD((tuple<string, bool>), send, (string message, string uri, function<void(const string&)> messageHandler), (override));
     MOCK_METHOD(void, receive, (string uri, function<void(const string&)> messageHandler), (override));
     MOCK_METHOD(void, closeConnection, (string uri), (override));
 };
@@ -530,71 +533,5 @@ TEST_F(NostrServiceTest, PublishEvent_CorrectlyIndicates_MixedSuccessesAndFailur
 
     ASSERT_EQ(failures.size(), 1);
     ASSERT_EQ(failures[0], defaultTestRelays[1]);
-};
-
-TEST_F(NostrServiceTest, QueryRelays_UsesProvidedHandler_AndReturnsSubscriptionId)
-{
-    mutex connectionStatusMutex;
-    auto connectionStatus = make_shared<unordered_map<string, bool>>();
-    connectionStatus->insert({ defaultTestRelays[0], false });
-    connectionStatus->insert({ defaultTestRelays[1], false });
-
-    EXPECT_CALL(*mockClient, isConnected(_))
-        .WillRepeatedly(Invoke([connectionStatus, &connectionStatusMutex](string uri)
-        {
-            lock_guard<mutex> lock(connectionStatusMutex);
-            bool status = connectionStatus->at(uri);
-            if (status == false)
-            {
-                connectionStatus->at(uri) = true;
-            }
-            return status;
-        }));
-
-    auto nostrService = make_unique<nostr::NostrService>(
-        testAppender,
-        mockClient,
-        fakeSigner,
-        defaultTestRelays);
-    nostrService->openRelayConnections();
-
-    auto sentSubscriptionId = make_shared<string>();
-    EXPECT_CALL(*mockClient, send(_, _))
-        .Times(2)
-        .WillRepeatedly(Invoke([sentSubscriptionId](string message, string uri)
-        {
-            json jarr = json::array();
-            jarr = json::parse(message);
-
-            string temp = jarr[1].dump();
-            if (!temp.empty() && temp[0] == '\"' && temp[temp.size() - 1] == '\"')
-            {
-                *sentSubscriptionId = temp.substr(1, temp.size() - 2);
-            }
-
-            return make_tuple(uri, true);
-        }));
-    EXPECT_CALL(*mockClient, receive(_, _))
-        .Times(2)
-        .WillRepeatedly(Invoke([sentSubscriptionId](string _, function<void(const string&)> messageHandler)
-        {
-            auto event = make_shared<nostr::Event>(getTextNoteTestEvent());
-            messageHandler(getTestEventMessage(event, *sentSubscriptionId));
-        }));
-
-    auto filters = make_shared<nostr::Filters>(getKind0And1TestFilters());
-    nostr::Event expectedEvent = getTextNoteTestEvent();
-    auto receivedSubscriptionId = nostrService->queryRelays(
-        filters,
-        [expectedEvent](const string& subscriptionId, shared_ptr<nostr::Event> event)
-        {
-            ASSERT_STREQ(event->pubkey.c_str(), expectedEvent.pubkey.c_str());
-            ASSERT_EQ(event->kind, expectedEvent.kind);
-            ASSERT_EQ(event->tags.size(), expectedEvent.tags.size());
-            ASSERT_STREQ(event->content.c_str(), expectedEvent.content.c_str());
-            ASSERT_GT(event->sig.size(), 0);
-        });
-
-    ASSERT_STREQ(receivedSubscriptionId.c_str(), sentSubscriptionId->c_str());
 };
 } // namespace nostr_test

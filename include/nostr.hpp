@@ -157,8 +157,22 @@ public:
      * @returns A tuple of `RelayList` objects, of the form `<successes, failures>`, indicating
      * to which relays the event was published successfully, and to which relays the event failed
      * to publish.
-    */
+     */
     std::tuple<RelayList, RelayList> publishEvent(std::shared_ptr<Event> event);
+
+    /**
+     * @brief Queries all open relay connections for events matching the given set of filters, and
+     * returns all stored matching events returned by the relays.
+     * @param filters The filters to use for the query.
+     * @returns A vector of all events matching the filters from all open relay connections.
+     * @remark This method runs until the relays send an EOSE message, indicating they have no more
+     * stored events matching the given filters.  When the EOSE message is received, the method
+     * will close the subscription for each relay and return the received events.
+     * @remark Use this method to fetch a batch of events from the relays.  A `limit` value must be
+     * set on the filters in the range 1-64, inclusive.  If no valid limit is given, it will be
+     * defaulted to 16.
+     */
+    std::vector<std::shared_ptr<Event>> queryRelays(std::shared_ptr<Filters> filters);
 
     /**
      * @brief Queries all open relay connections for events matching the given set of filters.
@@ -172,7 +186,9 @@ public:
      */
     std::string queryRelays(
         std::shared_ptr<Filters> filters,
-        std::function<void(const std::string&, std::shared_ptr<Event>)> responseHandler);
+        std::function<void(const std::string&, std::shared_ptr<Event>)> eventHandler,
+        std::function<void(const std::string&)> eoseHandler,
+        std::function<void(const std::string&, const std::string&)> closeHandler);
     
     /**
      * @brief Closes the subscription with the given ID on all open relay connections.
@@ -269,11 +285,29 @@ private:
     bool hasSubscription(std::string relay, std::string subscriptionId);
 
     /**
-     * @brief Parses messages received from the relay and invokes the appropriate message handler.
+     * @brief Parses EVENT messages received from the relay and invokes the given event handler.
+     * @param message The raw message received from the relay.
+     * @param eventHandler A callable object that will be invoked with the subscription ID and the
+     * payload of the event.
+     * @param eoseHandler A callable object that will be invoked with the subscription ID when the
+     * relay sends an EOSE message, indicating it has reached the end of stored events for the
+     * given query.
+     * @param closeHandler A callable object that will be invoked with the subscription ID and the
+     * message sent by the relay if the subscription is ended by the relay.
      */
-    void onMessage(
+    void onSubscriptionMessage(
         std::string message,
-        std::function<void(const std::string&, std::shared_ptr<Event>)> eventHandler);
+        std::function<void(const std::string&, std::shared_ptr<Event>)> eventHandler,
+        std::function<void(const std::string&)> eoseHandler,
+        std::function<void(const std::string&, const std::string&)> closeHandler);
+    
+    /**
+     * @brief Parses OK messages received from the relay and invokes the given acceptance handler.
+     * @remark The OK message type is sent to indicate whether the relay has accepted an event sent
+     * by the client.  Note that this is distinct from whether the message was successfully sent to
+     * the relay over the WebSocket connection.
+     */
+    void onAcceptance(std::string message, std::function<void(const bool)> acceptanceHandler);
 };
 
 class ISigner
