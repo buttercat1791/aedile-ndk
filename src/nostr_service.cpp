@@ -150,8 +150,9 @@ tuple<RelayList, RelayList> NostrService::publishEvent(shared_ptr<Event> event)
     }
 
     lock_guard<mutex> lock(this->_propertyMutex);
+    RelayList targetRelays = this->_activeRelays;
     vector<future<tuple<string, bool>>> publishFutures;
-    for (const string& relay : this->_activeRelays)
+    for (const string& relay : targetRelays)
     {
         promise<tuple<string, bool>> publishPromise;
         publishFutures.push_back(move(publishPromise.get_future()));
@@ -196,7 +197,7 @@ tuple<RelayList, RelayList> NostrService::publishEvent(shared_ptr<Event> event)
         }
     }
 
-    size_t targetCount = this->_activeRelays.size();
+    size_t targetCount = targetRelays.size();
     size_t successfulCount = successfulRelays.size();
     PLOG_INFO << "Published event to " << successfulCount << "/" << targetCount << " target relays.";
 

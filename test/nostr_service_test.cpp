@@ -422,10 +422,16 @@ TEST_F(NostrServiceTest, PublishEvent_CorrectlyIndicates_AllSuccesses)
         defaultTestRelays);
     nostrService->openRelayConnections();
 
-    EXPECT_CALL(*mockClient, send(_, _))
+    EXPECT_CALL(*mockClient, send(_, _, _))
         .Times(2)
-        .WillRepeatedly(Invoke([](string message, string uri)
+        .WillRepeatedly(Invoke([](string message, string uri, function<void(const string&)> messageHandler)
         {
+            json messageArr = json::parse(message);
+            auto event = nostr::Event::fromString(messageArr[1]);
+
+            json jarr = json::array({ "OK", event.id, true, "Event accepted" });
+            messageHandler(jarr.dump());
+
             return make_tuple(uri, true);
         }));
     
@@ -467,9 +473,10 @@ TEST_F(NostrServiceTest, PublishEvent_CorrectlyIndicates_AllFailures)
         defaultTestRelays);
     nostrService->openRelayConnections();
 
-    EXPECT_CALL(*mockClient, send(_, _))
+    // Simulate a case where the message failed to send to all relays.
+    EXPECT_CALL(*mockClient, send(_, _, _))
         .Times(2)
-        .WillRepeatedly(Invoke([](string message, string uri)
+        .WillRepeatedly(Invoke([](string message, string uri, function<void(const string&)> messageHandler)
         {
             return make_tuple(uri, false);
         }));
@@ -512,15 +519,23 @@ TEST_F(NostrServiceTest, PublishEvent_CorrectlyIndicates_MixedSuccessesAndFailur
         defaultTestRelays);
     nostrService->openRelayConnections();
 
-    EXPECT_CALL(*mockClient, send(_, defaultTestRelays[0]))
+    // Simulate a scenario where the message fails to send to one relay, but sends successfully to
+    // the other, and the relay accepts it.
+    EXPECT_CALL(*mockClient, send(_, defaultTestRelays[0], _))
         .Times(1)
-        .WillRepeatedly(Invoke([](string message, string uri)
+        .WillRepeatedly(Invoke([](string message, string uri, function<void(const string&)> messageHandler)
         {
+            json messageArr = json::parse(message);
+            auto event = nostr::Event::fromString(messageArr[1]);
+
+            json jarr = json::array({ "OK", event.id, true, "Event accepted" });
+            messageHandler(jarr.dump());
+
             return make_tuple(uri, true);
         }));
-    EXPECT_CALL(*mockClient, send(_, defaultTestRelays[1]))
+    EXPECT_CALL(*mockClient, send(_, defaultTestRelays[1], _))
         .Times(1)
-        .WillRepeatedly(Invoke([](string message, string uri)
+        .WillRepeatedly(Invoke([](string message, string uri, function<void(const string&)> messageHandler)
         {
             return make_tuple(uri, false);
         }));
@@ -534,4 +549,10 @@ TEST_F(NostrServiceTest, PublishEvent_CorrectlyIndicates_MixedSuccessesAndFailur
     ASSERT_EQ(failures.size(), 1);
     ASSERT_EQ(failures[0], defaultTestRelays[1]);
 };
+
+// TODO: Add unit tests for events rejected by relays.
+
+// TODO: Add unit tests for queries.
+
+// TODO: Add unit tests for closing subscriptions.
 } // namespace nostr_test
