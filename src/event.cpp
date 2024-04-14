@@ -12,6 +12,7 @@ using nlohmann::json;
 using std::hex;
 using std::invalid_argument;
 using std::make_shared;
+using std::ostringstream;
 using std::setw;
 using std::setfill;
 using std::shared_ptr;
@@ -49,21 +50,37 @@ string Event::serialize()
 Event Event::fromString(string jstr)
 {
     json j = json::parse(jstr);
+    Event event;
 
-    return Event::fromJson(j);
+    try
+    {
+        event = Event::fromJson(j);
+    }
+    catch (const invalid_argument& e)
+    {
+        throw e;
+    }
+
+    return event;
 };
 
 Event Event::fromJson(json j)
 {
     Event event;
 
-    event.id = j["id"];
-    event.pubkey = j["pubkey"];
-    event.createdAt = j["created_at"];
-    event.kind = j["kind"];
-    event.tags = j["tags"];
-    event.content = j["content"];
-    event.sig = j["sig"];
+    try {
+        event.id = j.at("id");
+        event.pubkey = j.at("pubkey");
+        event.createdAt = j.at("created_at");
+        event.kind = j.at("kind");
+        event.tags = j.at("tags");
+        event.content = j.at("content");
+        event.sig = j.at("sig");
+    } catch (const json::out_of_range& e) {
+        ostringstream oss;
+        oss << "Event::fromJson: Tried to access an out-of-range element: " << e.what();
+        throw invalid_argument(oss.str());
+    }
 
     return event;
 };

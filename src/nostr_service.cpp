@@ -19,6 +19,7 @@ using std::async;
 using std::find_if;
 using std::function;
 using std::future;
+using std::invalid_argument;
 using std::lock_guard;
 using std::make_shared;
 using std::make_tuple;
@@ -536,29 +537,39 @@ void NostrService::onSubscriptionMessage(
     try
     {
         json jMessage = json::parse(message);
-        string messageType = jMessage[0];
+        string messageType = jMessage.at(0);
         if (messageType == "EVENT")
         {
-            string subscriptionId = jMessage[1];
-            Event event = Event::fromString(jMessage[2]);
+            string subscriptionId = jMessage.at(1);
+            Event event = Event::fromString(jMessage.at(2));
             eventHandler(subscriptionId, make_shared<Event>(event));
         }
         else if (messageType == "EOSE")
         {
-            string subscriptionId = jMessage[1];
+            string subscriptionId = jMessage.at(1);
             eoseHandler(subscriptionId);
         }
         else if (messageType == "CLOSE")
         {
-            string subscriptionId = jMessage[1];
-            string reason = jMessage[2];
+            string subscriptionId = jMessage.at(1);
+            string reason = jMessage.at(2);
             closeHandler(subscriptionId, reason);
         }
+    }
+    catch (const json::out_of_range& joor)
+    {
+        PLOG_ERROR << "JSON out-of-range exception: " << joor.what();
+        throw joor;
     }
     catch (const json::exception& je)
     {
         PLOG_ERROR << "JSON handling exception: " << je.what();
         throw je;
+    }
+    catch (const invalid_argument& ia)
+    {
+        PLOG_ERROR << "Invalid argument exception: " << ia.what();
+        throw ia;
     }
 };
 
