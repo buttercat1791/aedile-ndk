@@ -231,38 +231,31 @@ vector<shared_ptr<Event>> NostrService::queryRelays(shared_ptr<Filters> filters)
         promise<tuple<string, bool>> eosePromise;
         requestFutures.push_back(move(eosePromise.get_future()));
 
-        try {
-            auto [uri, success] = this->_client->send(
-                request,
-                relay,
-                [this, &relay, &events, &eosePromise](string payload)
-                {
-                    this->onSubscriptionMessage(
-                        payload,
-                        [&events](const string&, shared_ptr<Event> event)
-                        {
-                            events.push_back(event);
-                        },
-                        [relay, &eosePromise](const string&)
-                        {
-                            eosePromise.set_value(make_tuple(relay, true));
-                        },
-                        [relay, &eosePromise](const string&, const string&)
-                        {
-                            eosePromise.set_value(make_tuple(relay, false));
-                        });
-                });
-
-            if (!success)
+        auto [uri, success] = this->_client->send(
+            request,
+            relay,
+            [this, &relay, &events, &eosePromise](string payload)
             {
-                PLOG_WARNING << "Failed to send query to relay: " << relay;
-                eosePromise.set_value(make_tuple(uri, false));
-            }
-        }
-        catch (const exception& e)
+                this->onSubscriptionMessage(
+                    payload,
+                    [&events](const string&, shared_ptr<Event> event)
+                    {
+                        events.push_back(event);
+                    },
+                    [relay, &eosePromise](const string&)
+                    {
+                        eosePromise.set_value(make_tuple(relay, true));
+                    },
+                    [relay, &eosePromise](const string&, const string&)
+                    {
+                        eosePromise.set_value(make_tuple(relay, false));
+                    });
+            });
+
+        if (!success)
         {
-            PLOG_ERROR << "Failed to send query to " << relay << ": " << e.what();
-            eosePromise.set_value(make_tuple(relay, false));
+            PLOG_WARNING << "Failed to send query to relay: " << relay;
+            eosePromise.set_value(make_tuple(uri, false));
         }
     }
 
