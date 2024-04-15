@@ -1,19 +1,15 @@
 #include <algorithm>
-#include <boost/uuid/uuid.hpp>
-#include <boost/uuid/uuid_generators.hpp>
-#include <boost/uuid/uuid_io.hpp>
+
 #include <nlohmann/json.hpp>
 #include <plog/Init.h>
 #include <plog/Log.h>
 #include <websocketpp/client.hpp>
 #include <websocketpp/config/asio_client.hpp>
+#include <uuid_v4/uuid_v4.h>
 
 #include "nostr.hpp"
 #include "client/web_socket_client.hpp"
 
-using boost::uuids::random_generator;
-using boost::uuids::to_string;
-using boost::uuids::uuid;
 using nlohmann::json;
 using std::async;
 using std::exception;
@@ -49,7 +45,7 @@ NostrService::NostrService(
     shared_ptr<ISigner> signer,
     RelayList relays)
 : _defaultRelays(relays), _client(client), _signer(signer)
-{ 
+{
     plog::init(plog::debug, appender.get());
     client->start();
 };
@@ -178,7 +174,7 @@ tuple<RelayList, RelayList> NostrService::publishEvent(shared_ptr<Event> event)
                     }
                 });
             });
-        
+
         if (!success)
         {
             PLOG_WARNING << "Failed to send event to relay: " << relay;
@@ -288,7 +284,7 @@ string NostrService::queryRelays(
     for (const string relay : this->_activeRelays)
     {
         this->_subscriptions[relay].push_back(subscriptionId);
-        
+
         promise<tuple<string, bool>> requestPromise;
         requestFutures.push_back(move(requestPromise.get_future()));
         future<tuple<string, bool>> requestFuture = async(
@@ -517,8 +513,9 @@ void NostrService::disconnect(string relay)
 
 string NostrService::generateSubscriptionId()
 {
-    uuid uuid = random_generator()();
-    return to_string(uuid);
+    UUIDv4::UUIDGenerator<std::mt19937_64> uuidGenerator;
+    UUIDv4::UUID uuid = uuidGenerator.getUUID();
+    return uuid.bytes();
 };
 
 string NostrService::generateCloseRequest(string subscriptionId)
