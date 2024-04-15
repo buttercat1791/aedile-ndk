@@ -16,6 +16,7 @@ using boost::uuids::to_string;
 using boost::uuids::uuid;
 using nlohmann::json;
 using std::async;
+using std::exception;
 using std::find_if;
 using std::function;
 using std::future;
@@ -158,7 +159,7 @@ tuple<RelayList, RelayList> NostrService::publishEvent(shared_ptr<Event> event)
         promise<tuple<string, bool>> publishPromise;
         publishFutures.push_back(move(publishPromise.get_future()));
 
-        auto [targetRelay, isSuccess] = this->_client->send(
+        auto [uri, success] = this->_client->send(
             message.dump(),
             relay,
             [this, &relay, &event, &publishPromise](string response)
@@ -178,7 +179,7 @@ tuple<RelayList, RelayList> NostrService::publishEvent(shared_ptr<Event> event)
                 });
             });
         
-        if (!isSuccess)
+        if (!success)
         {
             PLOG_WARNING << "Failed to send event to relay: " << relay;
             publishPromise.set_value(make_tuple(relay, false));
@@ -230,26 +231,39 @@ vector<shared_ptr<Event>> NostrService::queryRelays(shared_ptr<Filters> filters)
         promise<tuple<string, bool>> eosePromise;
         requestFutures.push_back(move(eosePromise.get_future()));
 
-        this->_client->send(
-            request,
-            relay,
-            [this, &relay, &events, &eosePromise](string payload)
+        try {
+            auto [uri, success] = this->_client->send(
+                request,
+                relay,
+                [this, &relay, &events, &eosePromise](string payload)
+                {
+                    this->onSubscriptionMessage(
+                        payload,
+                        [&events](const string&, shared_ptr<Event> event)
+                        {
+                            events.push_back(event);
+                        },
+                        [relay, &eosePromise](const string&)
+                        {
+                            eosePromise.set_value(make_tuple(relay, true));
+                        },
+                        [relay, &eosePromise](const string&, const string&)
+                        {
+                            eosePromise.set_value(make_tuple(relay, false));
+                        });
+                });
+
+            if (!success)
             {
-                this->onSubscriptionMessage(
-                    payload,
-                    [&events](const string&, shared_ptr<Event> event)
-                    {
-                        events.push_back(event);
-                    },
-                    [relay, &eosePromise](const string&)
-                    {
-                        eosePromise.set_value(make_tuple(relay, true));
-                    },
-                    [relay, &eosePromise](const string&, const string&)
-                    {
-                        eosePromise.set_value(make_tuple(relay, false));
-                    });
-            });
+                PLOG_WARNING << "Failed to send query to relay: " << relay;
+                eosePromise.set_value(make_tuple(uri, false));
+            }
+        }
+        catch (const exception& e)
+        {
+            PLOG_ERROR << "Failed to send query to " << relay << ": " << e.what();
+            eosePromise.set_value(make_tuple(relay, false));
+        }
     }
 
     for (auto& publishFuture : requestFutures)
@@ -282,6 +296,8 @@ string NostrService::queryRelays(
     {
         this->_subscriptions[relay].push_back(subscriptionId);
         
+        promise<tuple<string, bool>> requestPromise;
+        requestFutures.push_back(move(requestPromise.get_future()));
         future<tuple<string, bool>> requestFuture = async(
             [this, &relay, &request, &eventHandler, &eoseHandler, &closeHandler]()
             {
