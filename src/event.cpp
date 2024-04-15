@@ -4,7 +4,7 @@
 #include <sstream>
 #include <string>
 #include <nlohmann/json.hpp>
-#include <sha.h>
+#include <openssl/sha.h>
 
 #include "nostr.hpp"
 
@@ -20,7 +20,7 @@ using std::string;
 using std::stringstream;
 using std::time;
 
-namespace nostr 
+namespace nostr
 {
 string Event::serialize()
 {
