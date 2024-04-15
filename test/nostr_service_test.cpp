@@ -1,3 +1,4 @@
+#include <chrono>
 #include <gmock/gmock.h>
 #include <gtest/gtest.h>
 #include <nlohmann/json.hpp>
@@ -19,6 +20,7 @@ using std::shared_ptr;
 using std::string;
 using std::tuple;
 using std::unordered_map;
+using std::vector;
 using ::testing::_;
 using ::testing::Args;
 using ::testing::Invoke;
@@ -71,6 +73,50 @@ public:
         event.content = "Hello, World!";
 
         return event;
+    };
+
+    static const vector<nostr::Event> getMultipleTextNoteTestEvents()
+    {
+        auto now = std::chrono::system_clock::now();
+        std::time_t currentTime = std::chrono::system_clock::to_time_t(now);
+
+        nostr::Event event1;
+        event1.pubkey = "13tn5ccv2guflxgffq4aj0hw5x39pz70zcdrfd6vym887gry38zys28dask";
+        event1.kind = 1;
+        event1.tags = 
+        {
+            { "e", "5c83da77af1dec6d7289834998ad7aafbd9e2191396d75ec3cc27f5a77226f36", "wss://nostr.example.com" },
+            { "p", "f7234bd4c1394dda46d09f35bd384dd30cc552ad5541990f98844fb06676e9ca" },
+            { "a", "30023:f7234bd4c1394dda46d09f35bd384dd30cc552ad5541990f98844fb06676e9ca:abcd", "wss://nostr.example.com" }
+        };
+        event1.content = "Hello, World!";
+        event1.createdAt = currentTime;
+
+        nostr::Event event2;
+        event2.pubkey = "1l9d9jh67rkwayalrxcy686aujyz5pper5kzjv8jvg8pu9v9ns4ls0xvq42";
+        event2.kind = 1;
+        event2.tags =
+        {
+            { "e", "5c83da77af1dec6d7289834998ad7aafbd9e2191396d75ec3cc27f5a77226f36", "wss://nostr.example.com" },
+            { "p", "f7234bd4c1394dda46d09f35bd384dd30cc552ad5541990f98844fb06676e9ca" },
+            { "a", "30023:f7234bd4c1394dda46d09f35bd384dd30cc552ad5541990f98844fb06676e9ca:abcd", "wss://nostr.example.com" }
+        };
+        event2.content = "Welcome to Nostr!";
+        event2.createdAt = currentTime;
+        
+        nostr::Event event3;
+        event3.pubkey = "187ujhtmnv82ftg03h4heetwk3dd9mlfkf8th3fvmrk20nxk9mansuzuyla";
+        event3.kind = 1;
+        event3.tags =
+        {
+            { "e", "5c83da77af1dec6d7289834998ad7aafbd9e2191396d75ec3cc27f5a77226f36", "wss://nostr.example.com" },
+            { "p", "f7234bd4c1394dda46d09f35bd384dd30cc552ad5541990f98844fb06676e9ca" },
+            { "a", "30023:f7234bd4c1394dda46d09f35bd384dd30cc552ad5541990f98844fb06676e9ca:abcd", "wss://nostr.example.com" }
+        };
+        event3.content = "Time for some introductions!";
+        event3.createdAt = currentTime;
+
+        return { event1, event2, event3 };
     };
 
     static const nostr::Event getLongFormTestEvent()
@@ -550,7 +596,6 @@ TEST_F(NostrServiceTest, PublishEvent_CorrectlyIndicates_MixedSuccessesAndFailur
     ASSERT_EQ(failures[0], defaultTestRelays[0]);
 };
 
-// TODO: Add unit tests for events rejected by relays.
 TEST_F(NostrServiceTest, PublishEvent_CorrectlyIndicates_RejectedEvent)
 {
     mutex connectionStatusMutex;
@@ -665,6 +710,91 @@ TEST_F(NostrServiceTest, PublishEvent_CorrectlyIndicates_EventRejectedBySomeRela
 };
 
 // TODO: Add unit tests for queries.
+TEST_F(NostrServiceTest, QueryRelays_ReturnsEvents_UpToEOSE)
+{
+    mutex connectionStatusMutex;
+    auto connectionStatus = make_shared<unordered_map<string, bool>>();
+    connectionStatus->insert({ defaultTestRelays[0], false });
+    connectionStatus->insert({ defaultTestRelays[1], false });
+
+    EXPECT_CALL(*mockClient, isConnected(_))
+        .WillRepeatedly(Invoke([connectionStatus, &connectionStatusMutex](string uri)
+        {
+            lock_guard<mutex> lock(connectionStatusMutex);
+            bool status = connectionStatus->at(uri);
+            if (status == false)
+            {
+                connectionStatus->at(uri) = true;
+            }
+            return status;
+        }));
+
+    auto signer = make_unique<FakeSigner>();
+    auto nostrService = make_unique<nostr::NostrService>(
+        testAppender,
+        mockClient,
+        fakeSigner,
+        defaultTestRelays);
+    nostrService->openRelayConnections();
+
+    auto testEvents = getMultipleTextNoteTestEvents();
+    vector<shared_ptr<nostr::Event>> signedTestEvents;
+    for (nostr::Event testEvent : testEvents)
+    {
+        auto signedEvent = make_shared<nostr::Event>(testEvent);
+        signer->sign(signedEvent);
+
+        auto serializedEvent = signedEvent->serialize();
+        auto deserializedEvent = nostr::Event::fromString(serializedEvent);
+
+        signedEvent = make_shared<nostr::Event>(deserializedEvent);
+        signedTestEvents.push_back(signedEvent);
+    }
+
+    EXPECT_CALL(*mockClient, send(_, _, _))
+        .Times(2)
+        .WillRepeatedly(Invoke([&testEvents, &signer](
+            string message,
+            string uri,
+            function<void(const string&)> messageHandler)
+        {
+            json messageArr = json::parse(message);
+            string subscriptionId = messageArr.at(1);
+
+            for (auto event : testEvents)
+            {
+                auto sendableEvent = make_shared<nostr::Event>(event);
+                signer->sign(sendableEvent);
+                json jarr = json::array({ "EVENT", subscriptionId, sendableEvent->serialize() });
+                messageHandler(jarr.dump());
+            }
+
+            json jarr = json::array({ "EOSE", subscriptionId });
+            messageHandler(jarr.dump());
+
+            return make_tuple(uri, true);
+        }));
+
+    auto filters = make_shared<nostr::Filters>(getKind0And1TestFilters());
+    auto results = nostrService->queryRelays(filters);
+
+    // TODO: Check results size when the queryRelays method deduplicates results before returning.
+    // ASSERT_EQ(results.size(), testEvents.size());
+
+    // Check that the results contain the expected events.
+    for (auto resultEvent : results)
+    {
+        ASSERT_NE(
+            find_if(
+                signedTestEvents.begin(),
+                signedTestEvents.end(),
+                [&resultEvent](shared_ptr<nostr::Event> testEvent)
+                {
+                    return *testEvent == *resultEvent;
+                }),
+            signedTestEvents.end());
+    }
+};
 
 // TODO: Add unit tests for closing subscriptions.
 } // namespace nostr_test

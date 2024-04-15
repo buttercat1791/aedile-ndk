@@ -125,4 +125,18 @@ string Event::generateId(string serializedData) const
 
     return ss.str();
 };
+
+bool Event::operator==(const Event& other) const
+{
+    if (this->id.empty())
+    {
+        throw invalid_argument("Event::operator==: Cannot check equality, the left-side argument is undefined.");
+    }
+    if (other.id.empty())
+    {
+        throw invalid_argument("Event::operator==: Cannot check equality, the right-side argument is undefined.");
+    }
+
+    return this->id == other.id;
+};
 } // namespace nostr

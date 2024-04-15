@@ -58,6 +58,14 @@ struct Event
      */
     static Event fromJson(nlohmann::json j);
 
+    /**
+     * @brief Compares two events for equality.
+     * @remark Two events are considered equal if they have the same ID, since the ID is uniquely
+     * generated from the event data.  If the `id` field is empty for either event, the comparison
+     * function will throw an exception.
+     */
+    bool operator==(const Event& other) const;
+
 private:
     /**
      * @brief Validates the event.
