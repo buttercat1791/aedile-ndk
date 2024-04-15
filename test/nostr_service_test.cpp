@@ -525,6 +525,114 @@ TEST_F(NostrServiceTest, PublishEvent_CorrectlyIndicates_MixedSuccessesAndFailur
         .Times(1)
         .WillRepeatedly(Invoke([](string message, string uri, function<void(const string&)> messageHandler)
         {
+            return make_tuple(uri, false);
+        }));
+    EXPECT_CALL(*mockClient, send(_, defaultTestRelays[1], _))
+        .Times(1)
+        .WillRepeatedly(Invoke([](string message, string uri, function<void(const string&)> messageHandler)
+        {
+            json messageArr = json::parse(message);
+            auto event = nostr::Event::fromString(messageArr[1]);
+
+            json jarr = json::array({ "OK", event.id, true, "Event accepted" });
+            messageHandler(jarr.dump());
+
+            return make_tuple(uri, true);
+        }));
+    
+    auto testEvent = make_shared<nostr::Event>(getTextNoteTestEvent());
+    auto [successes, failures] = nostrService->publishEvent(testEvent);
+
+    ASSERT_EQ(successes.size(), 1);
+    ASSERT_EQ(successes[0], defaultTestRelays[1]);
+
+    ASSERT_EQ(failures.size(), 1);
+    ASSERT_EQ(failures[0], defaultTestRelays[0]);
+};
+
+// TODO: Add unit tests for events rejected by relays.
+TEST_F(NostrServiceTest, PublishEvent_CorrectlyIndicates_RejectedEvent)
+{
+    mutex connectionStatusMutex;
+    auto connectionStatus = make_shared<unordered_map<string, bool>>();
+    connectionStatus->insert({ defaultTestRelays[0], false });
+    connectionStatus->insert({ defaultTestRelays[1], false });
+
+    EXPECT_CALL(*mockClient, isConnected(_))
+        .WillRepeatedly(Invoke([connectionStatus, &connectionStatusMutex](string uri)
+        {
+            lock_guard<mutex> lock(connectionStatusMutex);
+            bool status = connectionStatus->at(uri);
+            if (status == false)
+            {
+                connectionStatus->at(uri) = true;
+            }
+            return status;
+        }));
+
+    auto nostrService = make_unique<nostr::NostrService>(
+        testAppender,
+        mockClient,
+        fakeSigner,
+        defaultTestRelays);
+    nostrService->openRelayConnections();
+
+    // Simulate a scenario where the message is rejected by all target relays.
+    EXPECT_CALL(*mockClient, send(_, _, _))
+        .Times(2)
+        .WillRepeatedly(Invoke([](string message, string uri, function<void(const string&)> messageHandler)
+        {
+            json messageArr = json::parse(message);
+            auto event = nostr::Event::fromString(messageArr[1]);
+
+            json jarr = json::array({ "OK", event.id, false, "Event rejected" });
+            messageHandler(jarr.dump());
+
+            return make_tuple(uri, true);
+        }));
+    
+    auto testEvent = make_shared<nostr::Event>(getTextNoteTestEvent());
+    auto [successes, failures] = nostrService->publishEvent(testEvent);
+
+    ASSERT_EQ(failures.size(), defaultTestRelays.size());
+    for (auto relay : failures)
+    {
+        ASSERT_NE(find(defaultTestRelays.begin(), defaultTestRelays.end(), relay), defaultTestRelays.end());
+    }
+};
+
+TEST_F(NostrServiceTest, PublishEvent_CorrectlyIndicates_EventRejectedBySomeRelays)
+{
+    mutex connectionStatusMutex;
+    auto connectionStatus = make_shared<unordered_map<string, bool>>();
+    connectionStatus->insert({ defaultTestRelays[0], false });
+    connectionStatus->insert({ defaultTestRelays[1], false });
+
+    EXPECT_CALL(*mockClient, isConnected(_))
+        .WillRepeatedly(Invoke([connectionStatus, &connectionStatusMutex](string uri)
+        {
+            lock_guard<mutex> lock(connectionStatusMutex);
+            bool status = connectionStatus->at(uri);
+            if (status == false)
+            {
+                connectionStatus->at(uri) = true;
+            }
+            return status;
+        }));
+
+    auto nostrService = make_unique<nostr::NostrService>(
+        testAppender,
+        mockClient,
+        fakeSigner,
+        defaultTestRelays);
+    nostrService->openRelayConnections();
+
+    // Simulate a scenario where the message fails to send to one relay, but sends successfully to
+    // the other, and the relay accepts it.
+    EXPECT_CALL(*mockClient, send(_, defaultTestRelays[0], _))
+        .Times(1)
+        .WillRepeatedly(Invoke([](string message, string uri, function<void(const string&)> messageHandler)
+        {
             json messageArr = json::parse(message);
             auto event = nostr::Event::fromString(messageArr[1]);
 
@@ -537,7 +645,13 @@ TEST_F(NostrServiceTest, PublishEvent_CorrectlyIndicates_MixedSuccessesAndFailur
         .Times(1)
         .WillRepeatedly(Invoke([](string message, string uri, function<void(const string&)> messageHandler)
         {
-            return make_tuple(uri, false);
+            json messageArr = json::parse(message);
+            auto event = nostr::Event::fromString(messageArr[1]);
+
+            json jarr = json::array({ "OK", event.id, false, "Event rejected" });
+            messageHandler(jarr.dump());
+
+            return make_tuple(uri, true);
         }));
     
     auto testEvent = make_shared<nostr::Event>(getTextNoteTestEvent());
@@ -549,8 +663,6 @@ TEST_F(NostrServiceTest, PublishEvent_CorrectlyIndicates_MixedSuccessesAndFailur
     ASSERT_EQ(failures.size(), 1);
     ASSERT_EQ(failures[0], defaultTestRelays[1]);
 };
-
-// TODO: Add unit tests for events rejected by relays.
 
 // TODO: Add unit tests for queries.
 
