@@ -1,24 +1,12 @@
 #include <ctime>
 #include <openssl/evp.h>
-#include <iomanip>
-#include <sstream>
-#include <string>
 #include <nlohmann/json.hpp>
 #include <openssl/sha.h>
 
 #include "nostr.hpp"
 
-using nlohmann::json;
-using std::hex;
-using std::invalid_argument;
-using std::make_shared;
-using std::ostringstream;
-using std::setw;
-using std::setfill;
-using std::shared_ptr;
-using std::string;
-using std::stringstream;
-using std::time;
+using namespace nlohmann;
+using namespace std;
 
 namespace nostr
 {

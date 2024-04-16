@@ -10,26 +10,9 @@
 #include "nostr.hpp"
 #include "client/web_socket_client.hpp"
 
-using nlohmann::json;
-using std::async;
-using std::exception;
-using std::find_if;
-using std::function;
-using std::future;
-using std::invalid_argument;
-using std::lock_guard;
-using std::make_shared;
-using std::make_tuple;
-using std::move;
-using std::mutex;
-using std::out_of_range;
-using std::promise;
-using std::shared_ptr;
-using std::string;
-using std::thread;
-using std::tuple;
-using std::unique_ptr;
-using std::vector;
+using namespace nlohmann;
+using namespace std;
+using namespace UUIDv4;
 
 namespace nostr
 {
@@ -513,8 +496,8 @@ void NostrService::disconnect(string relay)
 
 string NostrService::generateSubscriptionId()
 {
-    UUIDv4::UUIDGenerator<std::mt19937_64> uuidGenerator;
-    UUIDv4::UUID uuid = uuidGenerator.getUUID();
+    UUIDGenerator<std::mt19937_64> uuidGenerator;
+    UUID uuid = uuidGenerator.getUUID();
     return uuid.bytes();
 };
 
