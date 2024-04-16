@@ -1,15 +1,9 @@
-#include <ctime>
-#include <sstream>
-#include <string>
 #include <nlohmann/json.hpp>
 
 #include "nostr.hpp"
+using namespace nlohmann;
+using namespace std;
 
-using nlohmann::json;
-using std::invalid_argument;
-using std::stringstream;
-using std::string;
-using std::time;
 
 namespace nostr
 {
