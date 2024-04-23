@@ -6,6 +6,9 @@
 #include <tuple>
 #include <vector>
 
+#include <openssl/evp.h>
+#include <openssl/sha.h>
+
 #include <nlohmann/json.hpp>
 #include <plog/Log.h>
 #include <websocketpp/client.hpp>

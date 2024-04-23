@@ -36,3 +36,12 @@ build/
 
 # VS Code Settings
 .vscode/
+
+# CMake outputs
+_deps/
+CMakeFiles/
+Makefile
+CTestTestfile.cmake
+CMakeCache.txt
+cmake_install.cmake
+OpenSSL-prefix

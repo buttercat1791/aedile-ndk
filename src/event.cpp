@@ -1,7 +1,4 @@
 #include <ctime>
-#include <openssl/evp.h>
-#include <nlohmann/json.hpp>
-#include <openssl/sha.h>
 
 #include "nostr.hpp"
 

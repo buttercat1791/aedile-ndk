@@ -1,6 +1,3 @@
-#include <websocketpp/client.hpp>
-#include <websocketpp/config/asio_client.hpp>
-
 #include "web_socket_client.hpp"
 
 using std::error_code;

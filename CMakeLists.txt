@@ -1,21 +1,73 @@
 cmake_minimum_required(VERSION 3.14)
+cmake_policy(SET CMP0135 NEW)
 project(NostrSDK VERSION 0.0.1)
+
+include(ExternalProject)
+include(FetchContent)
 
 # Specify the C++ standard
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
-set (CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_SOURCE_DIR}/../out/${CMAKE_BUILD_TYPE}/bin/)
-set (CMAKE_LIBRARY_OUTPUT_DIRECTORY ${CMAKE_SOURCE_DIR}/../out/${CMAKE_BUILD_TYPE}/lib/)
-set (CMAKE_ARCHIVE_OUTPUT_DIRECTORY ${CMAKE_SOURCE_DIR}/../out/${CMAKE_BUILD_TYPE}/lib/)
+list(APPEND CMAKE_PREFIX_PATH ${CMAKE_SOURCE_DIR}/_deps)
 
-if(DEFINED ENV{WORKSPACE})
-    list(APPEND CMAKE_PREFIX_PATH $ENV{WORKSPACE}/env/uuid_v4)
+get_directory_property(HAS_PARENT PARENT_DIRECTORY)
+if(HAS_PARENT)
+    message(STATUS "Configuring as a subproject.")
+
+    set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_SOURCE_DIR}/../out/${CMAKE_BUILD_TYPE}/bin/)
+    set(CMAKE_LIBRARY_OUTPUT_DIRECTORY ${CMAKE_SOURCE_DIR}/../out/${CMAKE_BUILD_TYPE}/lib/)
+    set(CMAKE_ARCHIVE_OUTPUT_DIRECTORY ${CMAKE_SOURCE_DIR}/../out/${CMAKE_BUILD_TYPE}/lib/)
+    set(CMAKE_INSTALL_PREFIX ${CMAKE_SOURCE_DIR}/../env/)
+
+    set(Boost_INCLUDE_DIR ${CMAKE_SOURCE_DIR}/../env/boost/include)
 else()
-    list(APPEND CMAKE_PREFIX_PATH ../env/uuid_v4)
+    message(STATUS "Configuring as a standalone project.")
+
+    set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_SOURCE_DIR}/out/${CMAKE_BUILD_TYPE}/bin/)
+    set(CMAKE_LIBRARY_OUTPUT_DIRECTORY ${CMAKE_SOURCE_DIR}/out/${CMAKE_BUILD_TYPE}/lib/)
+    set(CMAKE_ARCHIVE_OUTPUT_DIRECTORY ${CMAKE_SOURCE_DIR}/out/${CMAKE_BUILD_TYPE}/lib/)
+
+    set(OPENSSL_INCLUDE_DIR ${OPENSSL_ROOT_DIR}/include/)
+    set(OPENSSL_LIBRARIES ${OPENSSL_ROOT_DIR}/lib/)
 endif()
 
-# Build the project.
+if(DEFINED ENV{WORKSPACE})
+    list(APPEND CMAKE_PREFIX_PATH $ENV{WORKSPACE}/env)
+else()
+    list(APPEND CMAKE_PREFIX_PATH ${CMAKE_SOURCE_DIR}/../env)
+endif()
+
+#======== Find unmanaged dependencies ========#
+find_package(OpenSSL REQUIRED)
+find_package(Boost REQUIRED COMPONENTS filesystem system thread regex)
+
+#======== Fetch header-only dependencies ========#
+FetchContent_Declare(
+    nlohmann_json
+    URL      https://github.com/nlohmann/json/releases/download/v3.11.3/json.tar.xz
+    URL_HASH SHA256=d6c65aca6b1ed68e7a182f4757257b107ae403032760ed6ef121c9d55e81757d
+    USES_TERMINAL_DOWNLOAD TRUE
+)
+FetchContent_Declare(
+    plog
+    URL https://github.com/SergiusTheBest/plog/archive/refs/tags/1.1.10.tar.gz
+    USES_TERMINAL_DOWNLOAD TRUE
+)
+FetchContent_Declare(
+    websocketpp
+    GIT_REPOSITORY git@github.com:zaphoyd/websocketpp.git
+    GIT_TAG 0.8.2
+)
+FetchContent_Declare(
+    uuid_v4
+    URL https://github.com/crashoz/uuid_v4/archive/refs/tags/v1.0.0.tar.gz
+    USES_TERMINAL_DOWNLOAD TRUE
+)
+
+FetchContent_MakeAvailable(nlohmann_json plog uuid_v4 websocketpp)
+
+#======== Build the project ========#
 set(INCLUDE_DIR ./include)
 set(CLIENT_INCLUDE_DIR ./include/client)
 include_directories(${INCLUDE_DIR})
@@ -35,28 +87,21 @@ set(SOURCES
     ${CLIENT_SOURCE_DIR}/websocketpp_client.cpp
 )
 
-find_package(nlohmann_json CONFIG REQUIRED)
-find_package(uuid_v4 REQUIRED)
-find_package(OpenSSL REQUIRED)
-find_package(plog CONFIG REQUIRED)
-find_package(websocketpp CONFIG REQUIRED)
-
 add_library(NostrSDK ${SOURCES} ${HEADERS})
 target_link_libraries(NostrSDK PRIVATE
     nlohmann_json::nlohmann_json
     OpenSSL::SSL
     OpenSSL::Crypto
     plog::plog
-    websocketpp::websocketpp
     uuid_v4::uuid_v4
+    websocketpp::websocketpp
 )
 set_target_properties(NostrSDK PROPERTIES WINDOWS_EXPORT_ALL_SYMBOLS YES)
 
-# Build the tests.
+#======== Build the tests ========#
 enable_testing()
 include(GoogleTest)
 
-include(FetchContent)
 FetchContent_Declare(
   googletest
   URL https://github.com/google/googletest/archive/03597a01ee50ed33e9dfd640b249b4be3799d395.zip
@@ -79,8 +124,8 @@ target_link_libraries(NostrSDKTest PRIVATE
     GTest::gtest_main
     NostrSDK
     plog::plog
-    websocketpp::websocketpp
     uuid_v4::uuid_v4
+    websocketpp::websocketpp
 )
 set_target_properties(NostrSDKTest PROPERTIES WINDOWS_EXPORT_ALL_SYMBOLS YES)
 
