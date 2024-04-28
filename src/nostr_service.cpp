@@ -1,12 +1,3 @@
-#include <algorithm>
-
-#include <nlohmann/json.hpp>
-#include <plog/Init.h>
-#include <plog/Log.h>
-#include <websocketpp/client.hpp>
-#include <websocketpp/config/asio_client.hpp>
-#include <uuid_v4/uuid_v4.h>
-
 #include "nostr.hpp"
 #include "client/web_socket_client.hpp"
 

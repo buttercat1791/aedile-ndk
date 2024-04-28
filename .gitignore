@@ -40,8 +40,11 @@ build/
 # CMake outputs
 _deps/
 CMakeFiles/
+out/
 Makefile
 CTestTestfile.cmake
 CMakeCache.txt
 cmake_install.cmake
-OpenSSL-prefix
+
+# vcpkg
+vcpkg_installed/
