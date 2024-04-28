@@ -41,6 +41,7 @@ build/
 _deps/
 CMakeFiles/
 out/
+Testing/
 Makefile
 CTestTestfile.cmake
 CMakeCache.txt

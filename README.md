@@ -12,7 +12,7 @@ This project uses CMake as its build system, and vcpkg as its dependency manager
 - C++17 compiler
 - vcpkg
 
-### Build Targets
+### Building and Testing
 
 The SDK aims to support Linux, Windows, and macOS build targets.  CMake presets are provided for each target.
 
@@ -23,4 +23,10 @@ To build the SDK on Linux, run the following commands from the project root:
 ```bash
 cmake --preset=linux .
 cmake --build ./build/linux
+```
+
+To run unit tests, use the following command:
+
+```bash
+ctest ./build/linux
 ```
