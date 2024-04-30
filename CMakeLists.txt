@@ -8,6 +8,7 @@ include(FetchContent)
 # Specify the C++ standard
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
+SET(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -march=native")
 
 get_directory_property(HAS_PARENT PARENT_DIRECTORY)
 if(HAS_PARENT)

@@ -3,10 +3,9 @@
 using namespace nlohmann;
 using namespace std;
 
-
 namespace nostr
 {
-string Filters::serialize(string subscriptionId)
+string Filters::serialize(string& subscriptionId)
 {
     try
     {
@@ -23,9 +22,8 @@ string Filters::serialize(string subscriptionId)
         {"kinds", this->kinds},
         {"since", this->since},
         {"until", this->until},
-        {"limit", this->limit}
-    };
-    
+        {"limit", this->limit}};
+
     for (auto& tag : this->tags)
     {
         stringstream ss;

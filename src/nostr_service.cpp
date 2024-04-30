@@ -3,7 +3,6 @@
 
 using namespace nlohmann;
 using namespace std;
-using namespace UUIDv4;
 
 namespace nostr
 {
@@ -189,7 +188,23 @@ vector<shared_ptr<Event>> NostrService::queryRelays(shared_ptr<Filters> filters)
     vector<shared_ptr<Event>> events;
 
     string subscriptionId = this->generateSubscriptionId();
-    string request = filters->serialize(subscriptionId);
+    string request;
+
+    try
+    {
+        request = filters->serialize(subscriptionId);
+    }
+    catch (const invalid_argument& e)
+    {
+        PLOG_ERROR << "Failed to serialize filters - invalid object: " << e.what();
+        throw e;
+    }
+    catch (const json::exception& je)
+    {
+        PLOG_ERROR << "Failed to serialize filters - JSON exception: " << je.what();
+        throw je;
+    }
+
     vector<future<tuple<string, bool>>> requestFutures;
 
     // Send the same query to each relay.  As events trickle in from each relay, they will be added
@@ -487,9 +502,9 @@ void NostrService::disconnect(string relay)
 
 string NostrService::generateSubscriptionId()
 {
-    UUIDGenerator<std::mt19937_64> uuidGenerator;
-    UUID uuid = uuidGenerator.getUUID();
-    return uuid.bytes();
+    UUIDv4::UUIDGenerator<std::mt19937_64> uuidGenerator;
+    UUIDv4::UUID uuid = uuidGenerator.getUUID();
+    return uuid.str();
 };
 
 string NostrService::generateCloseRequest(string subscriptionId)

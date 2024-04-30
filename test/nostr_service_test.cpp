@@ -741,6 +741,7 @@ TEST_F(NostrServiceTest, QueryRelays_ReturnsEvents_UpToEOSE)
     vector<shared_ptr<nostr::Event>> signedTestEvents;
     for (nostr::Event testEvent : testEvents)
     {
+        std::cout << "TEST: Signing event" << std::endl;
         auto signedEvent = make_shared<nostr::Event>(testEvent);
         signer->sign(signedEvent);
 
@@ -758,6 +759,7 @@ TEST_F(NostrServiceTest, QueryRelays_ReturnsEvents_UpToEOSE)
             string uri,
             function<void(const string&)> messageHandler)
         {
+            std::cout << "TEST: Sending message: " << message << std::endl;
             json messageArr = json::parse(message);
             string subscriptionId = messageArr.at(1);
 

@@ -24,8 +24,7 @@ string Event::serialize()
         {"kind", this->kind},
         {"tags", this->tags},
         {"content", this->content},
-        {"sig", this->sig}
-    };
+        {"sig", this->sig}};
 
     j["id"] = this->generateId(j.dump());
 

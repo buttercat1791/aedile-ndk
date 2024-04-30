@@ -114,7 +114,7 @@ struct Filters
      * @remarks The Nostr client is responsible for managing subscription IDs.  Responses from the
      * relay will be organized by subscription ID.
      */
-    std::string serialize(std::string subscriptionId);
+    std::string serialize(std::string& subscriptionId);
 
 private:
     /**
