@@ -1,6 +1,6 @@
 cmake_minimum_required(VERSION 3.19)
 cmake_policy(SET CMP0135 NEW)
-project(NostrSDK VERSION 0.1.0)
+project(aedile VERSION 0.0.2)
 
 include(ExternalProject)
 include(FetchContent)
@@ -69,15 +69,15 @@ set(SOURCES
     ${CLIENT_SOURCE_DIR}/websocketpp_client.cpp
 )
 
-add_library(NostrSDK ${SOURCES} ${HEADERS})
-target_link_libraries(NostrSDK PRIVATE
+add_library(aedile ${SOURCES} ${HEADERS})
+target_link_libraries(aedile PRIVATE
     nlohmann_json::nlohmann_json
     OpenSSL::SSL
     OpenSSL::Crypto
     plog::plog
     websocketpp::websocketpp
 )
-set_target_properties(NostrSDK PROPERTIES WINDOWS_EXPORT_ALL_SYMBOLS YES)
+set_target_properties(aedile PROPERTIES WINDOWS_EXPORT_ALL_SYMBOLS YES)
 
 #======== Build the tests ========#
 enable_testing()
@@ -98,15 +98,15 @@ set(TEST_SOURCES
     ${TEST_DIR}/nostr_service_test.cpp
 )
 
-add_executable(NostrSDKTest ${TEST_SOURCES} ${HEADERS})
-target_link_libraries(NostrSDKTest PRIVATE
+add_executable(aedile_test ${TEST_SOURCES} ${HEADERS})
+target_link_libraries(aedile_test PRIVATE
     GTest::gmock
     GTest::gtest
     GTest::gtest_main
-    NostrSDK
+    aedile
     plog::plog
     websocketpp::websocketpp
 )
-set_target_properties(NostrSDKTest PROPERTIES WINDOWS_EXPORT_ALL_SYMBOLS YES)
+set_target_properties(aedile_test PROPERTIES WINDOWS_EXPORT_ALL_SYMBOLS YES)
 
-gtest_add_tests(TARGET NostrSDKTest)
+gtest_add_tests(TARGET aedile_test)

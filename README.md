@@ -1,4 +1,4 @@
-# NostrSDK
+# Aedile
 
 C++ System Development Kit for Nostr
 
