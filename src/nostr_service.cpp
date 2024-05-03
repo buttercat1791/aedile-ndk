@@ -273,9 +273,6 @@ string NostrService::queryRelays(
     for (const string relay : this->_activeRelays)
     {
         this->_subscriptions[relay].push_back(subscriptionId);
-
-        promise<tuple<string, bool>> requestPromise;
-        requestFutures.push_back(move(requestPromise.get_future()));
         future<tuple<string, bool>> requestFuture = async(
             [this, &relay, &request, &eventHandler, &eoseHandler, &closeHandler]()
             {

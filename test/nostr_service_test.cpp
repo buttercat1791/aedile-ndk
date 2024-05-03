@@ -16,8 +16,10 @@ using std::lock_guard;
 using std::make_shared;
 using std::make_unique;
 using std::mutex;
+using std::promise;
 using std::shared_ptr;
 using std::string;
+using std::thread;
 using std::tuple;
 using std::unordered_map;
 using std::vector;
@@ -741,7 +743,6 @@ TEST_F(NostrServiceTest, QueryRelays_ReturnsEvents_UpToEOSE)
     vector<shared_ptr<nostr::Event>> signedTestEvents;
     for (nostr::Event testEvent : testEvents)
     {
-        std::cout << "TEST: Signing event" << std::endl;
         auto signedEvent = make_shared<nostr::Event>(testEvent);
         signer->sign(signedEvent);
 
@@ -759,7 +760,6 @@ TEST_F(NostrServiceTest, QueryRelays_ReturnsEvents_UpToEOSE)
             string uri,
             function<void(const string&)> messageHandler)
         {
-            std::cout << "TEST: Sending message: " << message << std::endl;
             json messageArr = json::parse(message);
             string subscriptionId = messageArr.at(1);
 
@@ -796,6 +796,107 @@ TEST_F(NostrServiceTest, QueryRelays_ReturnsEvents_UpToEOSE)
                 }),
             signedTestEvents.end());
     }
+};
+
+TEST_F(NostrServiceTest, QueryRelays_CallsHandler_WithReturnedEvents)
+{
+    mutex connectionStatusMutex;
+    auto connectionStatus = make_shared<unordered_map<string, bool>>();
+    connectionStatus->insert({ defaultTestRelays[0], false });
+    connectionStatus->insert({ defaultTestRelays[1], false });
+
+    EXPECT_CALL(*mockClient, isConnected(_))
+        .WillRepeatedly(Invoke([connectionStatus, &connectionStatusMutex](string uri)
+        {
+            lock_guard<mutex> lock(connectionStatusMutex);
+            bool status = connectionStatus->at(uri);
+            if (status == false)
+            {
+                connectionStatus->at(uri) = true;
+            }
+            return status;
+        }));
+
+    auto signer = make_unique<FakeSigner>();
+    auto nostrService = make_unique<nostr::NostrService>(
+        testAppender,
+        mockClient,
+        fakeSigner,
+        defaultTestRelays);
+    nostrService->openRelayConnections();
+
+    auto testEvents = getMultipleTextNoteTestEvents();
+    vector<shared_ptr<nostr::Event>> signedTestEvents;
+    for (nostr::Event testEvent : testEvents)
+    {
+        auto signedEvent = make_shared<nostr::Event>(testEvent);
+        signer->sign(signedEvent);
+
+        auto serializedEvent = signedEvent->serialize();
+        auto deserializedEvent = nostr::Event::fromString(serializedEvent);
+
+        signedEvent = make_shared<nostr::Event>(deserializedEvent);
+        signedTestEvents.push_back(signedEvent);
+    }
+
+    EXPECT_CALL(*mockClient, send(_, _, _))
+        .Times(2)
+        .WillRepeatedly(Invoke([&testEvents, &signer](
+            string message,
+            string uri,
+            function<void(const string&)> messageHandler)
+        {
+            json messageArr = json::parse(message);
+            string subscriptionId = messageArr.at(1);
+
+            for (auto event : testEvents)
+            {
+                auto sendableEvent = make_shared<nostr::Event>(event);
+                signer->sign(sendableEvent);
+                json jarr = json::array({ "EVENT", subscriptionId, sendableEvent->serialize() });
+                messageHandler(jarr.dump());
+            }
+
+            json jarr = json::array({ "EOSE", subscriptionId });
+            messageHandler(jarr.dump());
+
+            return make_tuple(uri, true);
+        }));
+
+    auto filters = make_shared<nostr::Filters>(getKind0And1TestFilters());
+    promise<void> eoseReceivedPromise;
+    auto eoseReceivedFuture = eoseReceivedPromise.get_future();
+    int eoseCount = 0;
+
+    string generatedSubscriptionId = nostrService->queryRelays(
+        filters,
+        [&generatedSubscriptionId, &signedTestEvents](const string& subscriptionId, shared_ptr<nostr::Event> event)
+        {
+            ASSERT_STREQ(subscriptionId.c_str(), generatedSubscriptionId.c_str());
+            ASSERT_NE(
+                find_if(
+                    signedTestEvents.begin(),
+                    signedTestEvents.end(),
+                    [&event](shared_ptr<nostr::Event> testEvent)
+                    {
+                        return *testEvent == *event;
+                    }),
+                signedTestEvents.end());
+        },
+        [&generatedSubscriptionId, &eoseReceivedPromise, &eoseCount]
+        (const string& subscriptionId)
+        {
+            std::cout << "EOSE received for subscription ID: " << subscriptionId << std::endl;
+            ASSERT_STREQ(subscriptionId.c_str(), generatedSubscriptionId.c_str());
+
+            if (++eoseCount == 2)
+            {
+                eoseReceivedPromise.set_value();
+            }
+        },
+        [](const string&, const string&) {});
+    
+    eoseReceivedFuture.wait();
 };
 
 // TODO: Add unit tests for closing subscriptions.

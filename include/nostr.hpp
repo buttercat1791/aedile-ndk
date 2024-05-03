@@ -191,8 +191,12 @@ public:
     /**
      * @brief Queries all open relay connections for events matching the given set of filters.
      * @param filters The filters to use for the query.
-     * @param responseHandler A callable object that will be invoked each time the client receives
+     * @param eventHandler A callable object that will be invoked each time the client receives
      * an event matching the filters.
+     * @param eoseHandler A callable object that will be invoked when the relay sends an EOSE
+     * message.
+     * @param closeHandler A callable object that will be invoked when the relay sends a CLOSE
+     * message.
      * @returns The ID of the subscription created for the query.
      * @remark By providing a response handler, the caller assumes responsibility for handling all
      * events returned from the relay for the given filters.  The service will not store the
