@@ -25,6 +25,7 @@ using std::unordered_map;
 using std::vector;
 using ::testing::_;
 using ::testing::Args;
+using ::testing::HasSubstr;
 using ::testing::Invoke;
 using ::testing::Return;
 using ::testing::Truly;
@@ -711,7 +712,6 @@ TEST_F(NostrServiceTest, PublishEvent_CorrectlyIndicates_EventRejectedBySomeRela
     ASSERT_EQ(failures[0], defaultTestRelays[1]);
 };
 
-// TODO: Add unit tests for queries.
 TEST_F(NostrServiceTest, QueryRelays_ReturnsEvents_UpToEOSE)
 {
     mutex connectionStatusMutex;
@@ -753,7 +753,8 @@ TEST_F(NostrServiceTest, QueryRelays_ReturnsEvents_UpToEOSE)
         signedTestEvents.push_back(signedEvent);
     }
 
-    EXPECT_CALL(*mockClient, send(_, _, _))
+    // Expect the query messages.
+    EXPECT_CALL(*mockClient, send(HasSubstr("REQ"), _, _))
         .Times(2)
         .WillRepeatedly(Invoke([&testEvents, &signer](
             string message,
@@ -776,6 +777,9 @@ TEST_F(NostrServiceTest, QueryRelays_ReturnsEvents_UpToEOSE)
 
             return make_tuple(uri, true);
         }));
+    // Expect the close subscription messages after the client receives events.
+    // TODO: Expect close message.
+    EXPECT_CALL(*mockClient, send(HasSubstr("CLOSE"), _)).Times(2);
 
     auto filters = make_shared<nostr::Filters>(getKind0And1TestFilters());
     auto results = nostrService->queryRelays(filters);
@@ -886,7 +890,6 @@ TEST_F(NostrServiceTest, QueryRelays_CallsHandler_WithReturnedEvents)
         [&generatedSubscriptionId, &eoseReceivedPromise, &eoseCount]
         (const string& subscriptionId)
         {
-            std::cout << "EOSE received for subscription ID: " << subscriptionId << std::endl;
             ASSERT_STREQ(subscriptionId.c_str(), generatedSubscriptionId.c_str());
 
             if (++eoseCount == 2)
@@ -900,4 +903,5 @@ TEST_F(NostrServiceTest, QueryRelays_CallsHandler_WithReturnedEvents)
 };
 
 // TODO: Add unit tests for closing subscriptions.
+
 } // namespace nostr_test

@@ -237,21 +237,35 @@ vector<shared_ptr<Event>> NostrService::queryRelays(shared_ptr<Filters> filters)
                     });
             });
 
-        if (!success)
+        if (success)
+        {
+            PLOG_INFO << "Sent query to relay: " << relay;
+            lock_guard<mutex> lock(this->_propertyMutex);
+            this->_subscriptions[relay].push_back(subscriptionId);
+        }
+        else
         {
             PLOG_WARNING << "Failed to send query to relay: " << relay;
             eosePromise.set_value(make_tuple(uri, false));
         }
     }
 
+    // Close open subscriptions and disconnect from relays after events are received.
     for (auto& publishFuture : requestFutures)
     {
         auto [relay, isEose] = publishFuture.get();
-        if (!isEose)
+        if (isEose)
         {
-            PLOG_WARNING << "Receive CLOSE message from relay: " << relay;
+            PLOG_INFO << "Received EOSE message from relay: " << relay;
+        }
+        else
+        {
+            PLOG_WARNING << "Received CLOSE message from relay: " << relay;
+            this->closeRelayConnections({ relay });
         }
     }
+    this->closeSubscription(subscriptionId);
+    this->closeRelayConnections(this->_activeRelays);
 
     // TODO: De-duplicate events in the vector before returning.
 
@@ -272,6 +286,7 @@ string NostrService::queryRelays(
     vector<future<tuple<string, bool>>> requestFutures;
     for (const string relay : this->_activeRelays)
     {
+        lock_guard<mutex> lock(this->_propertyMutex);
         this->_subscriptions[relay].push_back(subscriptionId);
         future<tuple<string, bool>> requestFuture = async(
             [this, &relay, &request, &eventHandler, &eoseHandler, &closeHandler]()
@@ -311,8 +326,8 @@ tuple<RelayList, RelayList> NostrService::closeSubscription(string subscriptionI
 {
     RelayList successfulRelays;
     RelayList failedRelays;
-
     vector<future<tuple<string, bool>>> closeFutures;
+    
     for (const string relay : this->_activeRelays)
     {
         if (!this->hasSubscription(relay, subscriptionId))
@@ -321,8 +336,9 @@ tuple<RelayList, RelayList> NostrService::closeSubscription(string subscriptionI
         }
 
         string request = this->generateCloseRequest(subscriptionId);
-        future<tuple<string, bool>> closeFuture = async([this, &relay, &request]()
+        future<tuple<string, bool>> closeFuture = async([this, relay, request]()
         {
+            PLOG_INFO << "Sending " << request << " to relay " << relay;
             return this->_client->send(request, relay);
         });
         closeFutures.push_back(move(closeFuture));
@@ -512,6 +528,7 @@ string NostrService::generateCloseRequest(string subscriptionId)
 
 bool NostrService::hasSubscription(string relay, string subscriptionId)
 {
+    lock_guard<mutex> lock(this->_propertyMutex);
     auto it = find(this->_subscriptions[relay].begin(), this->_subscriptions[relay].end(), subscriptionId);
     if (it != this->_subscriptions[relay].end()) // If the subscription is in this->_subscriptions[relay]
     {
