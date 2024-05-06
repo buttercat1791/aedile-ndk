@@ -22,7 +22,6 @@
 namespace nostr
 {
 typedef std::vector<std::string> RelayList;
-typedef std::unordered_map<std::string, std::vector<std::string>> TagMap;
 
 class ISigner;
 class NostrService;
@@ -101,7 +100,7 @@ struct Filters
     std::vector<std::string> ids; ///< Event IDs.
     std::vector<std::string> authors; ///< Event author npubs.
     std::vector<int> kinds; ///< Kind numbers.
-    TagMap tags; ///< Tag names mapped to lists of tag values.
+    std::unordered_map<std::string, std::vector<std::string>> tags; ///< Tag names mapped to lists of tag values.
     std::time_t since; ///< Unix timestamp.  Matching events must be newer than this.
     std::time_t until; ///< Unix timestamp.  Matching events must be older than this.
     int limit; ///< The maximum number of events the relay should return on the initial query.
@@ -142,6 +141,8 @@ public:
     RelayList defaultRelays() const;
 
     RelayList activeRelays() const;
+
+    std::unordered_map<std::string, std::vector<std::string>> subscriptions() const;
 
     /**
      * @brief Opens connections to the default Nostr relays of the instance, as specified in

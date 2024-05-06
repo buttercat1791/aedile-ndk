@@ -778,8 +778,12 @@ TEST_F(NostrServiceTest, QueryRelays_ReturnsEvents_UpToEOSE)
             return make_tuple(uri, true);
         }));
     // Expect the close subscription messages after the client receives events.
-    // TODO: Expect close message.
-    EXPECT_CALL(*mockClient, send(HasSubstr("CLOSE"), _)).Times(2);
+    EXPECT_CALL(*mockClient, send(HasSubstr("CLOSE"), _))
+        .Times(2)
+        .WillRepeatedly(Invoke([](string message, string uri)
+        {
+            return make_tuple(uri, true);
+        }));
 
     auto filters = make_shared<nostr::Filters>(getKind0And1TestFilters());
     auto results = nostrService->queryRelays(filters);
@@ -843,7 +847,7 @@ TEST_F(NostrServiceTest, QueryRelays_CallsHandler_WithReturnedEvents)
         signedTestEvents.push_back(signedEvent);
     }
 
-    EXPECT_CALL(*mockClient, send(_, _, _))
+    EXPECT_CALL(*mockClient, send(HasSubstr("REQ"), _, _))
         .Times(2)
         .WillRepeatedly(Invoke([&testEvents, &signer](
             string message,
@@ -900,8 +904,40 @@ TEST_F(NostrServiceTest, QueryRelays_CallsHandler_WithReturnedEvents)
         [](const string&, const string&) {});
     
     eoseReceivedFuture.wait();
+
+    // Check that the service is keeping track of its active subscriptions.
+    auto subscriptions = nostrService->subscriptions();
+    for (string uri : nostrService->activeRelays())
+    {
+        ASSERT_NO_THROW(subscriptions.at(uri));
+        ASSERT_EQ(subscriptions.at(uri).size(), 1);
+        ASSERT_NE(
+            find_if(
+                subscriptions[uri].begin(),
+                subscriptions[uri].end(),
+                [&generatedSubscriptionId](const string& subscriptionId)
+                {
+                    return subscriptionId == generatedSubscriptionId;
+                }),
+            subscriptions[uri].end());
+    }
+
+    EXPECT_CALL(*mockClient, send(HasSubstr("CLOSE"), _))
+        .Times(2)
+        .WillRepeatedly(Invoke([](string message, string uri)
+        {
+            return make_tuple(uri, true);
+        }));
+
+    nostrService->closeSubscription(generatedSubscriptionId);
+
+    // Check that the service has forgotten about the subscriptions after closing them.
+    subscriptions = nostrService->subscriptions();
+    for (string uri : nostrService->activeRelays())
+    {
+        ASSERT_EQ(subscriptions.at(uri).size(), 0);
+    }
 };
 
 // TODO: Add unit tests for closing subscriptions.
-
 } // namespace nostr_test

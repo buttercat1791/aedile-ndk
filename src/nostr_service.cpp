@@ -32,6 +32,8 @@ RelayList NostrService::defaultRelays() const { return this->_defaultRelays; };
 
 RelayList NostrService::activeRelays() const { return this->_activeRelays; };
 
+unordered_map<string, vector<string>> NostrService::subscriptions() const { return this->_subscriptions; };
+
 RelayList NostrService::openRelayConnections()
 {
     return this->openRelayConnections(this->_defaultRelays);
@@ -87,6 +89,9 @@ void NostrService::closeRelayConnections(RelayList relays)
             this->disconnect(relay);
         });
         disconnectionThreads.push_back(move(disconnectionThread));
+
+        lock_guard<mutex> lock(this->_propertyMutex);
+        this->_subscriptions.erase(relay);
     }
 
     for (thread& disconnectionThread : disconnectionThreads)
@@ -286,8 +291,10 @@ string NostrService::queryRelays(
     vector<future<tuple<string, bool>>> requestFutures;
     for (const string relay : this->_activeRelays)
     {
-        lock_guard<mutex> lock(this->_propertyMutex);
+        unique_lock<mutex> lock(this->_propertyMutex);
         this->_subscriptions[relay].push_back(subscriptionId);
+        lock.unlock();
+
         future<tuple<string, bool>> requestFuture = async(
             [this, &relay, &request, &eventHandler, &eoseHandler, &closeHandler]()
             {
@@ -350,6 +357,13 @@ tuple<RelayList, RelayList> NostrService::closeSubscription(string subscriptionI
         if (isSuccess)
         {
             successfulRelays.push_back(relay);
+
+            lock_guard<mutex> lock(this->_propertyMutex);
+            auto it = find(
+                this->_subscriptions[relay].begin(),
+                this->_subscriptions[relay].end(),
+                subscriptionId);
+            this->_subscriptions[relay].erase(it);
         }
         else
         {
@@ -382,7 +396,11 @@ tuple<RelayList, RelayList> NostrService::closeSubscriptions(RelayList relays)
             RelayList successfulRelays;
             RelayList failedRelays;
 
-            for (const string& subscriptionId : this->_subscriptions[relay])
+            unique_lock<mutex> lock(this->_propertyMutex);
+            auto subscriptionIds = this->_subscriptions[relay];
+            lock.unlock();
+
+            for (const string& subscriptionId : subscriptionIds)
             {
                 auto [successes, failures] = this->closeSubscription(subscriptionId);
                 successfulRelays.insert(successfulRelays.end(), successes.begin(), successes.end());
