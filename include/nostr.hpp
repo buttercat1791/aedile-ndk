@@ -21,8 +21,6 @@
 
 namespace nostr
 {
-typedef std::vector<std::string> RelayList;
-
 class ISigner;
 class NostrService;
 
@@ -135,12 +133,12 @@ public:
         std::shared_ptr<plog::IAppender> appender,
         std::shared_ptr<client::IWebSocketClient> client,
         std::shared_ptr<ISigner> signer,
-        RelayList relays);
+        std::vector<std::string> relays);
     ~NostrService();
 
-    RelayList defaultRelays() const;
+    std::vector<std::string> defaultRelays() const;
 
-    RelayList activeRelays() const;
+    std::vector<std::string> activeRelays() const;
 
     std::unordered_map<std::string, std::vector<std::string>> subscriptions() const;
 
@@ -149,13 +147,13 @@ public:
      * the constructor.
      * @return A list of the relay URLs to which connections were successfully opened.
      */
-    RelayList openRelayConnections();
+    std::vector<std::string> openRelayConnections();
 
     /**
      * @brief Opens connections to the specified Nostr relays.
      * @returns A list of the relay URLs to which connections were successfully opened.
      */
-    RelayList openRelayConnections(RelayList relays);
+    std::vector<std::string> openRelayConnections(std::vector<std::string> relays);
 
     /**
      * @brief Closes all open relay connections.
@@ -165,15 +163,15 @@ public:
     /**
      * @brief Closes any open connections to the specified Nostr relays.
      */
-    void closeRelayConnections(RelayList relays);
+    void closeRelayConnections(std::vector<std::string> relays);
     
     /**
      * @brief Publishes a Nostr event to all open relay connections.
-     * @returns A tuple of `RelayList` objects, of the form `<successes, failures>`, indicating
+     * @returns A tuple of `std::vector<std::string>` objects, of the form `<successes, failures>`, indicating
      * to which relays the event was published successfully, and to which relays the event failed
      * to publish.
      */
-    std::tuple<RelayList, RelayList> publishEvent(std::shared_ptr<Event> event);
+    std::tuple<std::vector<std::string>, std::vector<std::string>> publishEvent(std::shared_ptr<Event> event);
 
     /**
      * @brief Queries all open relay connections for events matching the given set of filters, and
@@ -211,11 +209,11 @@ public:
     
     /**
      * @brief Closes the subscription with the given ID on all open relay connections.
-     * @returns A tuple of `RelayList` objects, of the form `<successes, failures>`, indicating
+     * @returns A tuple of `std::vector<std::string>` objects, of the form `<successes, failures>`, indicating
      * to which relays the message was sent successfully, and which relays failed to receive the
      * message.
      */
-    std::tuple<RelayList, RelayList> closeSubscription(std::string subscriptionId);
+    std::tuple<std::vector<std::string>, std::vector<std::string>> closeSubscription(std::string subscriptionId);
 
     /**
      * @brief Closes the subscription with the given ID on the given relay.
@@ -235,7 +233,7 @@ public:
      * @brief Closes all open subscriptions on the given relays.
      * @returns A list of any subscription IDs that failed to close.
      */
-    std::vector<std::string> closeSubscriptions(RelayList relays);
+    std::vector<std::string> closeSubscriptions(std::vector<std::string> relays);
 
 private:
     ///< The maximum number of events the service will store for each subscription.
@@ -249,9 +247,9 @@ private:
     ///< A mutex to protect the instance properties.
     std::mutex _propertyMutex;
     ///< The default set of Nostr relays to which the service will attempt to connect.
-    RelayList _defaultRelays;
+    std::vector<std::string> _defaultRelays;
     ///< The set of Nostr relays to which the service is currently connected.
-    RelayList _activeRelays; 
+    std::vector<std::string> _activeRelays; 
     ///< A map from subscription IDs to the relays on which each subscription is open.
     std::unordered_map<std::string, std::vector<std::string>> _subscriptions;
 
@@ -259,13 +257,13 @@ private:
      * @brief Determines which of the given relays are currently connected.
      * @returns A list of the URIs of currently-open relay connections from the given list.
      */
-    RelayList getConnectedRelays(RelayList relays);
+    std::vector<std::string> getConnectedRelays(std::vector<std::string> relays);
 
     /**
      * @brief Determines which of the given relays are not currently connected.
      * @returns A list of the URIs of currently-unconnected relays from the given list.
      */
-    RelayList getUnconnectedRelays(RelayList relays);
+    std::vector<std::string> getUnconnectedRelays(std::vector<std::string> relays);
 
     /**
      * @brief Determines whether the given relay is currently connected.

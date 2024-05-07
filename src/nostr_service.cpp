@@ -16,7 +16,7 @@ NostrService::NostrService(
     shared_ptr<plog::IAppender> appender,
     shared_ptr<client::IWebSocketClient> client,
     shared_ptr<ISigner> signer,
-    RelayList relays)
+    vector<string> relays)
 : _defaultRelays(relays), _client(client), _signer(signer)
 {
     plog::init(plog::debug, appender.get());
@@ -28,21 +28,21 @@ NostrService::~NostrService()
     this->_client->stop();
 };
 
-RelayList NostrService::defaultRelays() const { return this->_defaultRelays; };
+vector<string> NostrService::defaultRelays() const { return this->_defaultRelays; };
 
-RelayList NostrService::activeRelays() const { return this->_activeRelays; };
+vector<string> NostrService::activeRelays() const { return this->_activeRelays; };
 
 unordered_map<string, vector<string>> NostrService::subscriptions() const { return this->_subscriptions; };
 
-RelayList NostrService::openRelayConnections()
+vector<string> NostrService::openRelayConnections()
 {
     return this->openRelayConnections(this->_defaultRelays);
 };
 
-RelayList NostrService::openRelayConnections(RelayList relays)
+vector<string> NostrService::openRelayConnections(vector<string> relays)
 {
     PLOG_INFO << "Attempting to connect to Nostr relays.";
-    RelayList unconnectedRelays = this->getUnconnectedRelays(relays);
+    vector<string> unconnectedRelays = this->getUnconnectedRelays(relays);
 
     vector<thread> connectionThreads;
     for (string relay : unconnectedRelays)
@@ -77,10 +77,10 @@ void NostrService::closeRelayConnections()
     this->closeRelayConnections(this->_activeRelays);
 };
 
-void NostrService::closeRelayConnections(RelayList relays)
+void NostrService::closeRelayConnections(vector<string> relays)
 {
     PLOG_INFO << "Disconnecting from Nostr relays.";
-    RelayList connectedRelays = getConnectedRelays(relays);
+    vector<string> connectedRelays = getConnectedRelays(relays);
 
     vector<thread> disconnectionThreads;
     for (string relay : connectedRelays)
@@ -102,10 +102,10 @@ void NostrService::closeRelayConnections(RelayList relays)
 };
 
 // TODO: Make this method return a promise.
-tuple<RelayList, RelayList> NostrService::publishEvent(shared_ptr<Event> event)
+tuple<vector<string>, vector<string>> NostrService::publishEvent(shared_ptr<Event> event)
 {
-    RelayList successfulRelays;
-    RelayList failedRelays;
+    vector<string> successfulRelays;
+    vector<string> failedRelays;
 
     PLOG_INFO << "Attempting to publish event to Nostr relays.";
 
@@ -127,7 +127,7 @@ tuple<RelayList, RelayList> NostrService::publishEvent(shared_ptr<Event> event)
     }
 
     lock_guard<mutex> lock(this->_propertyMutex);
-    RelayList targetRelays = this->_activeRelays;
+    vector<string> targetRelays = this->_activeRelays;
     vector<future<tuple<string, bool>>> publishFutures;
     for (const string& relay : targetRelays)
     {
@@ -283,8 +283,8 @@ string NostrService::queryRelays(
     function<void(const string&)> eoseHandler,
     function<void(const string&, const string&)> closeHandler)
 {
-    RelayList successfulRelays;
-    RelayList failedRelays;
+    vector<string> successfulRelays;
+    vector<string> failedRelays;
 
     string subscriptionId = this->generateSubscriptionId();
     string request = filters->serialize(subscriptionId);
@@ -329,10 +329,10 @@ string NostrService::queryRelays(
     return subscriptionId;
 };
 
-tuple<RelayList, RelayList> NostrService::closeSubscription(string subscriptionId)
+tuple<vector<string>, vector<string>> NostrService::closeSubscription(string subscriptionId)
 {
-    RelayList successfulRelays;
-    RelayList failedRelays;
+    vector<string> successfulRelays;
+    vector<string> failedRelays;
 
     vector<string> subscriptionRelays;
     size_t subscriptionRelayCount;
@@ -452,10 +452,10 @@ vector<string> NostrService::closeSubscriptions()
     return remainingSubscriptions;
 };
 
-RelayList NostrService::getConnectedRelays(RelayList relays)
+vector<string> NostrService::getConnectedRelays(vector<string> relays)
 {
     PLOG_VERBOSE << "Identifying connected relays.";
-    RelayList connectedRelays;
+    vector<string> connectedRelays;
     for (string relay : relays)
     {
         bool isActive = find(this->_activeRelays.begin(), this->_activeRelays.end(), relay)
@@ -480,10 +480,10 @@ RelayList NostrService::getConnectedRelays(RelayList relays)
     return connectedRelays;
 };
 
-RelayList NostrService::getUnconnectedRelays(RelayList relays)
+vector<string> NostrService::getUnconnectedRelays(vector<string> relays)
 {
     PLOG_VERBOSE << "Identifying unconnected relays.";
-    RelayList unconnectedRelays;
+    vector<string> unconnectedRelays;
     for (string relay : relays)
     {
         bool isActive = find(this->_activeRelays.begin(), this->_activeRelays.end(), relay)

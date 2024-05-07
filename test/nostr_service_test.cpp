@@ -10,25 +10,10 @@
 #include <client/web_socket_client.hpp>
 #include <nostr.hpp>
 
+using namespace std;
+using namespace ::testing;
+
 using nlohmann::json;
-using std::function;
-using std::lock_guard;
-using std::make_shared;
-using std::make_unique;
-using std::mutex;
-using std::promise;
-using std::shared_ptr;
-using std::string;
-using std::thread;
-using std::tuple;
-using std::unordered_map;
-using std::vector;
-using ::testing::_;
-using ::testing::Args;
-using ::testing::HasSubstr;
-using ::testing::Invoke;
-using ::testing::Return;
-using ::testing::Truly;
 
 namespace nostr_test
 {
@@ -56,7 +41,7 @@ public:
 class NostrServiceTest : public testing::Test
 {
 public:
-    inline static const nostr::RelayList defaultTestRelays =
+    inline static const vector<string> defaultTestRelays =
     {
         "wss://relay.damus.io",
         "wss://nostr.thesamecat.io"
@@ -273,7 +258,7 @@ TEST_F(NostrServiceTest, OpenRelayConnections_OpensConnections_ToDefaultRelays)
 
 TEST_F(NostrServiceTest, OpenRelayConnections_OpensConnections_ToProvidedRelays)
 {
-    nostr::RelayList testRelays = { "wss://nos.lol" };
+    vector<string> testRelays = { "wss://nos.lol" };
 
     mutex connectionStatusMutex;
     auto connectionStatus = make_shared<unordered_map<string, bool>>();
@@ -312,7 +297,7 @@ TEST_F(NostrServiceTest, OpenRelayConnections_OpensConnections_ToProvidedRelays)
 
 TEST_F(NostrServiceTest, OpenRelayConnections_AddsOpenConnections_ToActiveRelays)
 {
-    nostr::RelayList testRelays = { "wss://nos.lol" };
+    vector<string> testRelays = { "wss://nos.lol" };
 
     mutex connectionStatusMutex;
     auto connectionStatus = make_shared<unordered_map<string, bool>>();
@@ -401,8 +386,8 @@ TEST_F(NostrServiceTest, CloseRelayConnections_ClosesConnections_ToActiveRelays)
 
 TEST_F(NostrServiceTest, CloseRelayConnections_RemovesClosedConnections_FromActiveRelays)
 {
-    nostr::RelayList testRelays = { "wss://nos.lol" };
-    nostr::RelayList allTestRelays = { defaultTestRelays[0], defaultTestRelays[1], testRelays[0] };
+    vector<string> testRelays = { "wss://nos.lol" };
+    vector<string> allTestRelays = { defaultTestRelays[0], defaultTestRelays[1], testRelays[0] };
 
     mutex connectionStatusMutex;
     auto connectionStatus = make_shared<unordered_map<string, bool>>();
