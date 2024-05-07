@@ -218,20 +218,24 @@ public:
     std::tuple<RelayList, RelayList> closeSubscription(std::string subscriptionId);
 
     /**
-     * @brief Closes all open subscriptions on all open relay connections.
-     * @returns A tuple of `RelayList` objects, of the form `<successes, failures>`, indicating
-     * to which relays the message was sent successfully, and which relays failed to receive the
-     * message.
+     * @brief Closes the subscription with the given ID on the given relay.
+     * @returns True if the relay received the CLOSE message, false otherwise.
+     * @remark If the subscription does not exist on the given relay, or if the relay is not
+     * connected, the method will do nothing and return false.
      */
-    std::tuple<RelayList, RelayList> closeSubscriptions();
+    bool closeSubscription(std::string subscriptionId, std::string relay);
+
+    /**
+     * @brief Closes all open subscriptions on all open relay connections.
+     * @returns A list of any subscription IDs that failed to close.
+     */
+    std::vector<std::string> closeSubscriptions();
 
     /**
      * @brief Closes all open subscriptions on the given relays.
-     * @returns A tuple of `RelayList` objects, of the form `<successes, failures>`, indicating
-     * to which relays the message was sent successfully, and which relays failed to receive the
-     * message.
+     * @returns A list of any subscription IDs that failed to close.
      */
-    std::tuple<RelayList, RelayList> closeSubscriptions(RelayList relays);
+    std::vector<std::string> closeSubscriptions(RelayList relays);
 
 private:
     ///< The maximum number of events the service will store for each subscription.
@@ -248,7 +252,7 @@ private:
     RelayList _defaultRelays;
     ///< The set of Nostr relays to which the service is currently connected.
     RelayList _activeRelays; 
-    ///< A map from relay URIs to the subscription IDs open on each relay.
+    ///< A map from subscription IDs to the relays on which each subscription is open.
     std::unordered_map<std::string, std::vector<std::string>> _subscriptions;
 
     /**
@@ -297,11 +301,17 @@ private:
     std::string generateCloseRequest(std::string subscriptionId);
 
     /**
-     * @brief Indicates whether the connection to the given relay has a subscription with the given
-     * ID.
-     * @returns True if the relay has the subscription, false otherwise.
+     * @brief Indicates whether the the service has an open subscription with the given ID.
+     * @returns True if the service has the subscription, false otherwise.
      */
-    bool hasSubscription(std::string relay, std::string subscriptionId);
+    bool hasSubscription(std::string subscriptionId);
+
+    /**
+     * @brief Indicates whether the service has an open subscription with the given ID on the given
+     * relay.
+     * @returns True if the subscription exists on the relay, false otherwise.
+     */
+    bool hasSubscription(std::string subscriptionId, std::string relay);
 
     /**
      * @brief Parses EVENT messages received from the relay and invokes the given event handler.

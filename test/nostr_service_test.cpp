@@ -804,6 +804,9 @@ TEST_F(NostrServiceTest, QueryRelays_ReturnsEvents_UpToEOSE)
                 }),
             signedTestEvents.end());
     }
+
+    auto subscriptions = nostrService->subscriptions();
+    ASSERT_TRUE(subscriptions.empty());
 };
 
 TEST_F(NostrServiceTest, QueryRelays_CallsHandler_WithReturnedEvents)
@@ -907,20 +910,8 @@ TEST_F(NostrServiceTest, QueryRelays_CallsHandler_WithReturnedEvents)
 
     // Check that the service is keeping track of its active subscriptions.
     auto subscriptions = nostrService->subscriptions();
-    for (string uri : nostrService->activeRelays())
-    {
-        ASSERT_NO_THROW(subscriptions.at(uri));
-        ASSERT_EQ(subscriptions.at(uri).size(), 1);
-        ASSERT_NE(
-            find_if(
-                subscriptions[uri].begin(),
-                subscriptions[uri].end(),
-                [&generatedSubscriptionId](const string& subscriptionId)
-                {
-                    return subscriptionId == generatedSubscriptionId;
-                }),
-            subscriptions[uri].end());
-    }
+    ASSERT_NO_THROW(subscriptions.at(generatedSubscriptionId));
+    ASSERT_EQ(subscriptions.at(generatedSubscriptionId).size(), 2);
 
     EXPECT_CALL(*mockClient, send(HasSubstr("CLOSE"), _))
         .Times(2)
@@ -929,15 +920,181 @@ TEST_F(NostrServiceTest, QueryRelays_CallsHandler_WithReturnedEvents)
             return make_tuple(uri, true);
         }));
 
-    nostrService->closeSubscription(generatedSubscriptionId);
+    auto [successes, failures] = nostrService->closeSubscription(generatedSubscriptionId);
+
+    ASSERT_TRUE(failures.empty());
 
     // Check that the service has forgotten about the subscriptions after closing them.
     subscriptions = nostrService->subscriptions();
-    for (string uri : nostrService->activeRelays())
-    {
-        ASSERT_EQ(subscriptions.at(uri).size(), 0);
-    }
+    ASSERT_TRUE(subscriptions.empty());
 };
 
-// TODO: Add unit tests for closing subscriptions.
+TEST_F(NostrServiceTest, Service_MaintainsMultipleSubscriptions_ThenClosesAll)
+{
+    // Mock connections.
+    mutex connectionStatusMutex;
+    auto connectionStatus = make_shared<unordered_map<string, bool>>();
+    vector<string> testRelays = { "wss://theforest.nostr1.com" };
+    connectionStatus->insert({ testRelays[0], false });
+
+    EXPECT_CALL(*mockClient, isConnected(_))
+        .WillRepeatedly(Invoke([connectionStatus, &connectionStatusMutex](string uri)
+        {
+            lock_guard<mutex> lock(connectionStatusMutex);
+            bool status = connectionStatus->at(uri);
+            if (status == false)
+            {
+                connectionStatus->at(uri) = true;
+            }
+            return status;
+        }));
+
+    auto signer = make_unique<FakeSigner>();
+    auto nostrService = make_unique<nostr::NostrService>(
+        testAppender,
+        mockClient,
+        fakeSigner,
+        testRelays);
+    nostrService->openRelayConnections();
+
+    // Mock relay responses.
+    auto testEvents = getMultipleTextNoteTestEvents();
+    vector<shared_ptr<nostr::Event>> signedTestEvents;
+    for (nostr::Event testEvent : testEvents)
+    {
+        auto signedEvent = make_shared<nostr::Event>(testEvent);
+        signer->sign(signedEvent);
+
+        auto serializedEvent = signedEvent->serialize();
+        auto deserializedEvent = nostr::Event::fromString(serializedEvent);
+
+        signedEvent = make_shared<nostr::Event>(deserializedEvent);
+        signedTestEvents.push_back(signedEvent);
+    }
+
+    vector<string> subscriptionIds;
+    EXPECT_CALL(*mockClient, send(HasSubstr("REQ"), _, _))
+        .Times(2)
+        .WillOnce(Invoke([&testEvents, &signer, &subscriptionIds](
+            string message,
+            string uri,
+            function<void(const string&)> messageHandler)
+        {
+            json messageArr = json::parse(message);
+            subscriptionIds.push_back(messageArr.at(1));
+
+            for (auto event : testEvents)
+            {
+                auto sendableEvent = make_shared<nostr::Event>(event);
+                signer->sign(sendableEvent);
+                json jarr = json::array({ "EVENT", subscriptionIds.at(0), sendableEvent->serialize() });
+                messageHandler(jarr.dump());
+            }
+
+            json jarr = json::array({ "EOSE", subscriptionIds.at(0), });
+            messageHandler(jarr.dump());
+
+            return make_tuple(uri, true);
+        }))
+        .WillOnce(Invoke([&testEvents, &signer, &subscriptionIds](
+            string message,
+            string uri,
+            function<void(const string&)> messageHandler)
+        {
+            json messageArr = json::parse(message);
+            subscriptionIds.push_back(messageArr.at(1));
+
+            for (auto event : testEvents)
+            {
+                auto sendableEvent = make_shared<nostr::Event>(event);
+                signer->sign(sendableEvent);
+                json jarr = json::array({ "EVENT", subscriptionIds.at(1), sendableEvent->serialize() });
+                messageHandler(jarr.dump());
+            }
+
+            json jarr = json::array({ "EOSE", subscriptionIds.at(1), });
+            messageHandler(jarr.dump());
+
+            return make_tuple(uri, true);
+        }));
+
+    // Send queries.
+    auto shortFormFilters = make_shared<nostr::Filters>(getKind0And1TestFilters());
+    auto longFormFilters = make_shared<nostr::Filters>(getKind30023TestFilters());
+    promise<void> shortFormPromise;
+    promise<void> longFormPromise;
+    auto shortFormFuture = shortFormPromise.get_future();
+    auto longFormFuture = longFormPromise.get_future();
+
+    string shortFormSubscriptionId = nostrService->queryRelays(
+        shortFormFilters,
+        [&shortFormSubscriptionId, &signedTestEvents](const string& subscriptionId, shared_ptr<nostr::Event> event)
+        {
+            ASSERT_STREQ(subscriptionId.c_str(), shortFormSubscriptionId.c_str());
+            ASSERT_NE(
+                find_if(
+                    signedTestEvents.begin(),
+                    signedTestEvents.end(),
+                    [&event](shared_ptr<nostr::Event> testEvent)
+                    {
+                        return *testEvent == *event;
+                    }),
+                signedTestEvents.end());
+        },
+        [&shortFormSubscriptionId, &shortFormPromise]
+        (const string& subscriptionId)
+        {
+            ASSERT_STREQ(subscriptionId.c_str(), shortFormSubscriptionId.c_str());
+            shortFormPromise.set_value();
+        },
+        [](const string&, const string&) {});
+    string longFormSubscriptionId = nostrService->queryRelays(
+        shortFormFilters,
+        [&longFormSubscriptionId, &signedTestEvents](const string& subscriptionId, shared_ptr<nostr::Event> event)
+        {
+            ASSERT_STREQ(subscriptionId.c_str(), longFormSubscriptionId.c_str());
+            ASSERT_NE(
+                find_if(
+                    signedTestEvents.begin(),
+                    signedTestEvents.end(),
+                    [&event](shared_ptr<nostr::Event> testEvent)
+                    {
+                        return *testEvent == *event;
+                    }),
+                signedTestEvents.end());
+        },
+        [&longFormSubscriptionId, &longFormPromise]
+        (const string& subscriptionId)
+        {
+            ASSERT_STREQ(subscriptionId.c_str(), longFormSubscriptionId.c_str());
+            longFormPromise.set_value();
+        },
+        [](const string&, const string&) {});
+    
+    shortFormFuture.wait();
+    longFormFuture.wait();
+
+    // Check that the service has opened a subscription for each query.
+    auto subscriptions = nostrService->subscriptions();
+    ASSERT_NO_THROW(subscriptions.at(shortFormSubscriptionId));
+    ASSERT_EQ(subscriptions.at(shortFormSubscriptionId).size(), 1);
+    ASSERT_NO_THROW(subscriptions.at(longFormSubscriptionId));
+    ASSERT_EQ(subscriptions.at(longFormSubscriptionId).size(), 1);
+
+    // Mock the relay response for closing subscriptions.
+    EXPECT_CALL(*mockClient, send(HasSubstr("CLOSE"), _))
+        .Times(2)
+        .WillRepeatedly(Invoke([](string message, string uri)
+        {
+            return make_tuple(uri, true);
+        }));
+
+    // Close all subscriptions maintained by the service.
+    auto remainingSubscriptions = nostrService->closeSubscriptions();
+    ASSERT_TRUE(remainingSubscriptions.empty());
+
+    // Check that all subscriptions have been closed.
+    subscriptions = nostrService->subscriptions();
+    ASSERT_TRUE(subscriptions.empty());
+};
 } // namespace nostr_test
