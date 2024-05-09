@@ -1,6 +1,10 @@
 #pragma once
 
+#include <functional>
 #include <string>
+
+#include <websocketpp/client.hpp>
+#include <websocketpp/config/asio_client.hpp>
 
 namespace client
 {
@@ -40,6 +44,27 @@ public:
      * sent.
      */
     virtual std::tuple<std::string, bool> send(std::string message, std::string uri) = 0;
+
+    /**
+     * @brief Sends the given message to the given server and sets up a message handler for
+     * messages received from the server.
+     * @returns A tuple indicating the server URI and whether the message was successfully
+     * sent.
+     * @remark Use this method to send a message and set up a message handler for responses in the
+     * same call.
+     */
+    virtual std::tuple<std::string, bool> send(
+        std::string message,
+        std::string uri,
+        std::function<void(const std::string&)> messageHandler) = 0;
+
+    /**
+     * @brief Sets up a message handler for the given server.
+     * @param uri The URI of the server to which the message handler should be attached.
+     * @param messageHandler A callable object that will be invoked with the payload the client
+     * receives from the server.
+     */
+    virtual void receive(std::string uri, std::function<void(const std::string&)> messageHandler) = 0;
 
     /**
      * @brief Closes the connection to the given server.

@@ -1,18 +1,61 @@
-cmake_minimum_required(VERSION 3.14)
-project(NostrSDK VERSION 0.0.1)
+cmake_minimum_required(VERSION 3.19)
+cmake_policy(SET CMP0135 NEW)
+project(aedile VERSION 0.0.2)
+
+include(ExternalProject)
+include(FetchContent)
 
 # Specify the C++ standard
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
+SET(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -march=native")
 
-set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bin)
-set(CMAKE_LIBRARY_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/lib)
+get_directory_property(HAS_PARENT PARENT_DIRECTORY)
+if(HAS_PARENT)
+    message(STATUS "Configuring as a subproject.")
 
-# Build the project.
+    set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_SOURCE_DIR}/../out/${CMAKE_BUILD_TYPE}/bin/)
+    set(CMAKE_LIBRARY_OUTPUT_DIRECTORY ${CMAKE_SOURCE_DIR}/../out/${CMAKE_BUILD_TYPE}/lib/)
+    set(CMAKE_ARCHIVE_OUTPUT_DIRECTORY ${CMAKE_SOURCE_DIR}/../out/${CMAKE_BUILD_TYPE}/lib/)
+    set(CMAKE_INSTALL_PREFIX ${CMAKE_SOURCE_DIR}/../env/)
+
+    if(DEFINED ENV{WORKSPACE})
+        list(APPEND CMAKE_PREFIX_PATH $ENV{WORKSPACE}/env)
+    else()
+        list(APPEND CMAKE_PREFIX_PATH ${CMAKE_SOURCE_DIR}/../env)
+    endif()
+else()
+    message(STATUS "Configuring as a standalone project.")
+
+    set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_SOURCE_DIR}/out/${CMAKE_BUILD_TYPE}/bin/)
+    set(CMAKE_LIBRARY_OUTPUT_DIRECTORY ${CMAKE_SOURCE_DIR}/out/${CMAKE_BUILD_TYPE}/lib/)
+    set(CMAKE_ARCHIVE_OUTPUT_DIRECTORY ${CMAKE_SOURCE_DIR}/out/${CMAKE_BUILD_TYPE}/lib/)
+endif()
+
+#======== Find dependencies ========#
+find_package(nlohmann_json CONFIG REQUIRED)
+find_package(OpenSSL REQUIRED)
+find_package(plog CONFIG REQUIRED)
+find_package(websocketpp CONFIG REQUIRED)
+
+#======== Configure uuid_v4 ========#
+FetchContent_Declare(
+    uuid_v4
+    GIT_REPOSITORY git@github.com:crashoz/uuid_v4.git
+    GIT_TAG v1.0.0
+)
+FetchContent_Populate(uuid_v4)
+set(uuid_v4_INCLUDE_DIR ${CMAKE_SOURCE_DIR}/_deps/uuid_v4-src/)
+
+find_path(uuid_v4_INCLUDE_DIR uuid_v4.h)
+include_directories(${uuid_v4_INCLUDE_DIR})
+
+#======== Build the project ========#
 set(INCLUDE_DIR ./include)
 set(CLIENT_INCLUDE_DIR ./include/client)
 include_directories(${INCLUDE_DIR})
 include_directories(${CLIENT_INCLUDE_DIR})
+
 set(HEADERS
     ${INCLUDE_DIR}/nostr.hpp
     ${CLIENT_INCLUDE_DIR}/web_socket_client.hpp
@@ -22,33 +65,25 @@ set(SOURCE_DIR ./src)
 set(CLIENT_SOURCE_DIR ./src/client)
 set(SOURCES
     ${SOURCE_DIR}/event.cpp
+    ${SOURCE_DIR}/filters.cpp
     ${SOURCE_DIR}/nostr_service.cpp
     ${CLIENT_SOURCE_DIR}/websocketpp_client.cpp
 )
 
-find_package(Boost REQUIRED COMPONENTS random system)
-find_package(nlohmann_json CONFIG REQUIRED)
-find_package(OpenSSL REQUIRED)
-find_package(plog CONFIG REQUIRED)
-find_package(websocketpp CONFIG REQUIRED)
-
-add_library(NostrSDK ${SOURCES} ${HEADERS})
-target_link_libraries(NostrSDK PRIVATE
-    Boost::random
-    Boost::system
+add_library(aedile ${SOURCES} ${HEADERS})
+target_link_libraries(aedile PRIVATE
     nlohmann_json::nlohmann_json
     OpenSSL::SSL
     OpenSSL::Crypto
     plog::plog
     websocketpp::websocketpp
 )
-set_target_properties(NostrSDK PROPERTIES WINDOWS_EXPORT_ALL_SYMBOLS YES)
+set_target_properties(aedile PROPERTIES WINDOWS_EXPORT_ALL_SYMBOLS YES)
 
-# Build the tests.
+#======== Build the tests ========#
 enable_testing()
 include(GoogleTest)
 
-include(FetchContent)
 FetchContent_Declare(
   googletest
   URL https://github.com/google/googletest/archive/03597a01ee50ed33e9dfd640b249b4be3799d395.zip
@@ -64,15 +99,15 @@ set(TEST_SOURCES
     ${TEST_DIR}/nostr_service_test.cpp
 )
 
-add_executable(NostrSDKTest ${TEST_SOURCES} ${HEADERS})
-target_link_libraries(NostrSDKTest PRIVATE
+add_executable(aedile_test ${TEST_SOURCES} ${HEADERS})
+target_link_libraries(aedile_test PRIVATE
     GTest::gmock
     GTest::gtest
     GTest::gtest_main
-    NostrSDK
+    aedile
     plog::plog
     websocketpp::websocketpp
 )
-set_target_properties(NostrSDKTest PROPERTIES WINDOWS_EXPORT_ALL_SYMBOLS YES)
+set_target_properties(aedile_test PROPERTIES WINDOWS_EXPORT_ALL_SYMBOLS YES)
 
-gtest_add_tests(TARGET NostrSDKTest)
+gtest_add_tests(TARGET aedile_test)

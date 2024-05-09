@@ -36,3 +36,16 @@ build/
 
 # VS Code Settings
 .vscode/
+
+# CMake outputs
+_deps/
+CMakeFiles/
+out/
+Testing/
+Makefile
+CTestTestfile.cmake
+CMakeCache.txt
+cmake_install.cmake
+
+# vcpkg
+vcpkg_installed/

@@ -1,9 +1,7 @@
-#include <websocketpp/client.hpp>
-#include <websocketpp/config/asio_client.hpp>
-
 #include "web_socket_client.hpp"
 
 using std::error_code;
+using std::function;
 using std::lock_guard;
 using std::make_tuple;
 using std::mutex;
@@ -76,11 +74,31 @@ public:
 
         if (error.value() == -1)    
         {
-            // PLOG_ERROR << "Error publishing event to relay " << relay << ": " << error.message();
             return make_tuple(uri, false);
         }
 
         return make_tuple(uri, true);
+    };
+
+    tuple<string, bool> send(string message, string uri, function<void(const string&)> messageHandler) override
+    {
+        auto successes = this->send(message, uri);
+        this->receive(uri, messageHandler);
+        return successes;
+    };
+
+    void receive(string uri, function<void(const string&)> messageHandler) override
+    {
+        lock_guard<mutex> lock(this->_propertyMutex);
+        auto connectionHandle = this->_connectionHandles[uri];
+        auto connection = this->_client.get_con_from_hdl(connectionHandle);
+
+        connection->set_message_handler([messageHandler](
+            websocketpp::connection_hdl connectionHandle,
+            websocketpp_client::message_ptr message)
+        {
+            messageHandler(message->get_payload());
+        });
     };
 
     void closeConnection(string uri) override
@@ -103,5 +121,9 @@ private:
     websocketpp_client _client;
     unordered_map<string, websocketpp::connection_hdl> _connectionHandles;
     mutex _propertyMutex;
+
+    void onMessage(websocketpp::connection_hdl handle, websocketpp_client::message_ptr message)
+    {
+    };
 };
 } // namespace client
