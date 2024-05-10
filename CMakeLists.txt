@@ -50,6 +50,16 @@ set(uuid_v4_INCLUDE_DIR ${CMAKE_SOURCE_DIR}/_deps/uuid_v4-src/)
 find_path(uuid_v4_INCLUDE_DIR uuid_v4.h)
 include_directories(${uuid_v4_INCLUDE_DIR})
 
+#======== Configure noscrypt ========#
+FetchContent_Declare(
+    libnoscrypt
+    GIT_REPOSITORY git@github.com:VnUgE/noscrypt.git
+    GIT_TAG 872c49d1925b2576f85ec2587747119e895a675b
+)
+FetchContent_MakeAvailable(libnoscrypt)
+
+set_target_properties(noscrypt PROPERTIES CRYPTO_LIB openssl)
+
 #======== Build the project ========#
 set(INCLUDE_DIR ./include)
 set(CLIENT_INCLUDE_DIR ./include/client)
@@ -101,10 +111,10 @@ set(TEST_SOURCES
 
 add_executable(aedile_test ${TEST_SOURCES} ${HEADERS})
 target_link_libraries(aedile_test PRIVATE
+    aedile
     GTest::gmock
     GTest::gtest
     GTest::gtest_main
-    aedile
     plog::plog
     websocketpp::websocketpp
 )
