@@ -1,5 +1,4 @@
 #include "nostr.hpp"
-#include "client/web_socket_client.hpp"
 
 using namespace nlohmann;
 using namespace std;
@@ -9,13 +8,13 @@ namespace nostr
 NostrService::NostrService(
     shared_ptr<plog::IAppender> appender,
     shared_ptr<client::IWebSocketClient> client,
-    shared_ptr<ISigner> signer)
+    shared_ptr<signer::ISigner> signer)
 : NostrService(appender, client, signer, {}) { };
 
 NostrService::NostrService(
     shared_ptr<plog::IAppender> appender,
     shared_ptr<client::IWebSocketClient> client,
-    shared_ptr<ISigner> signer,
+    shared_ptr<signer::ISigner> signer,
     vector<string> relays)
 : _defaultRelays(relays), _client(client), _signer(signer)
 {
@@ -58,8 +57,8 @@ vector<string> NostrService::openRelayConnections(vector<string> relays)
         connectionThread.join();
     }
 
-    size_t targetCount = relays.size();
-    size_t activeCount = this->_activeRelays.size();
+    std::size_t targetCount = relays.size();
+    std::size_t activeCount = this->_activeRelays.size();
     PLOG_INFO << "Connected to " << activeCount << "/" << targetCount << " target relays.";
 
     // This property should only contain successful relays at this point.
@@ -102,7 +101,7 @@ void NostrService::closeRelayConnections(vector<string> relays)
 };
 
 // TODO: Make this method return a promise.
-tuple<vector<string>, vector<string>> NostrService::publishEvent(shared_ptr<Event> event)
+tuple<vector<string>, vector<string>> NostrService::publishEvent(shared_ptr<data::Event> event)
 {
     vector<string> successfulRelays;
     vector<string> failedRelays;
@@ -174,8 +173,8 @@ tuple<vector<string>, vector<string>> NostrService::publishEvent(shared_ptr<Even
         }
     }
 
-    size_t targetCount = targetRelays.size();
-    size_t successfulCount = successfulRelays.size();
+    std::size_t targetCount = targetRelays.size();
+    std::size_t successfulCount = successfulRelays.size();
     PLOG_INFO << "Published event to " << successfulCount << "/" << targetCount << " target relays.";
 
     return make_tuple(successfulRelays, failedRelays);
@@ -183,7 +182,7 @@ tuple<vector<string>, vector<string>> NostrService::publishEvent(shared_ptr<Even
 
 // TODO: Make this method return a promise.
 // TODO: Add a timeout to this method to prevent hanging while waiting for the relay.
-vector<shared_ptr<Event>> NostrService::queryRelays(shared_ptr<Filters> filters)
+vector<shared_ptr<data::Event>> NostrService::queryRelays(shared_ptr<data::Filters> filters)
 {
     if (filters->limit > 64 || filters->limit < 1)
     {
@@ -191,7 +190,7 @@ vector<shared_ptr<Event>> NostrService::queryRelays(shared_ptr<Filters> filters)
         filters->limit = 16;
     }
 
-    vector<shared_ptr<Event>> events;
+    vector<shared_ptr<data::Event>> events;
 
     string subscriptionId = this->generateSubscriptionId();
     string request;
@@ -229,7 +228,7 @@ vector<shared_ptr<Event>> NostrService::queryRelays(shared_ptr<Filters> filters)
             {
                 this->onSubscriptionMessage(
                     payload,
-                    [&events](const string&, shared_ptr<Event> event)
+                    [&events](const string&, shared_ptr<data::Event> event)
                     {
                         events.push_back(event);
                     },
@@ -278,8 +277,8 @@ vector<shared_ptr<Event>> NostrService::queryRelays(shared_ptr<Filters> filters)
 };
 
 string NostrService::queryRelays(
-    shared_ptr<Filters> filters,
-    function<void(const string&, shared_ptr<Event>)> eventHandler,
+    shared_ptr<data::Filters> filters,
+    function<void(const string&, shared_ptr<data::Event>)> eventHandler,
     function<void(const string&)> eoseHandler,
     function<void(const string&, const string&)> closeHandler)
 {
@@ -322,8 +321,8 @@ string NostrService::queryRelays(
         }
     }
 
-    size_t targetCount = this->_activeRelays.size();
-    size_t successfulCount = successfulRelays.size();
+    std::size_t targetCount = this->_activeRelays.size();
+    std::size_t successfulCount = successfulRelays.size();
     PLOG_INFO << "Sent query to " << successfulCount << "/" << targetCount << " open relay connections.";
 
     return subscriptionId;
@@ -335,7 +334,7 @@ tuple<vector<string>, vector<string>> NostrService::closeSubscription(string sub
     vector<string> failedRelays;
 
     vector<string> subscriptionRelays;
-    size_t subscriptionRelayCount;
+    std::size_t subscriptionRelayCount;
     vector<future<tuple<string, bool>>> closeFutures;
 
     try
@@ -375,7 +374,7 @@ tuple<vector<string>, vector<string>> NostrService::closeSubscription(string sub
         }
     }
 
-    size_t successfulCount = successfulRelays.size();
+    std::size_t successfulCount = successfulRelays.size();
     PLOG_INFO << "Sent CLOSE request for subscription " << subscriptionId << " to " << successfulCount << "/" << subscriptionRelayCount << " open relay connections.";
 
     // If there were no failures, and the subscription has been closed on all of its relays, forget
@@ -596,7 +595,7 @@ bool NostrService::hasSubscription(string subscriptionId, string relay)
 
 void NostrService::onSubscriptionMessage(
     string message,
-    function<void(const string&, shared_ptr<Event>)> eventHandler,
+    function<void(const string&, shared_ptr<data::Event>)> eventHandler,
     function<void(const string&)> eoseHandler,
     function<void(const string&, const string&)> closeHandler)
 {
@@ -607,8 +606,8 @@ void NostrService::onSubscriptionMessage(
         if (messageType == "EVENT")
         {
             string subscriptionId = jMessage.at(1);
-            Event event = Event::fromString(jMessage.at(2));
-            eventHandler(subscriptionId, make_shared<Event>(event));
+            data::Event event = data::Event::fromString(jMessage.at(2));
+            eventHandler(subscriptionId, make_shared<data::Event>(event));
         }
         else if (messageType == "EOSE")
         {

@@ -6,6 +6,8 @@
 #include <websocketpp/client.hpp>
 #include <websocketpp/config/asio_client.hpp>
 
+namespace nostr
+{
 namespace client
 {
 /**
@@ -72,3 +74,4 @@ public:
     virtual void closeConnection(std::string uri) = 0;
 };
 } // namespace client
+} // namespace nostr

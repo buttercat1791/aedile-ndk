@@ -1,9 +1,11 @@
-#include "nostr.hpp"
+#include "data/data.hpp"
 
 using namespace nlohmann;
 using namespace std;
 
 namespace nostr
+{
+namespace data
 {
 string Filters::serialize(string& subscriptionId)
 {
@@ -64,4 +66,5 @@ void Filters::validate()
         throw invalid_argument("Filters::validate: At least one filter must be set.");
     }
 };
+} // namespace data
 } // namespace nostr

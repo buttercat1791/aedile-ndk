@@ -1,11 +1,11 @@
-#include <ctime>
-
-#include "nostr.hpp"
+#include "data/data.hpp"
 
 using namespace nlohmann;
 using namespace std;
 
 namespace nostr
+{
+namespace data
 {
 string Event::serialize()
 {
@@ -123,4 +123,5 @@ bool Event::operator==(const Event& other) const
 
     return this->id == other.id;
 };
+} // namespace data
 } // namespace nostr

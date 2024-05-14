@@ -9,6 +9,8 @@ using std::string;
 using std::tuple;
 using std::unordered_map;
 
+namespace nostr
+{
 namespace client
 {
 /**
@@ -127,3 +129,4 @@ private:
     };
 };
 } // namespace client
+} // namespace nostr

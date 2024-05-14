@@ -8,7 +8,8 @@ include(FetchContent)
 # Specify the C++ standard
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
-SET(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -march=native")
+set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -march=native")
+set(CMAKE_POSITION_INDEPENDENT_CODE ON)
 
 get_directory_property(HAS_PARENT PARENT_DIRECTORY)
 if(HAS_PARENT)
@@ -45,39 +46,50 @@ FetchContent_Declare(
     GIT_TAG v1.0.0
 )
 FetchContent_Populate(uuid_v4)
-set(uuid_v4_INCLUDE_DIR ${CMAKE_SOURCE_DIR}/_deps/uuid_v4-src/)
 
-find_path(uuid_v4_INCLUDE_DIR uuid_v4.h)
-include_directories(${uuid_v4_INCLUDE_DIR})
+FetchContent_GetProperties(uuid_v4)
+include_directories(${uuid_v4_SOURCE_DIR})
 
 #======== Configure noscrypt ========#
 FetchContent_Declare(
     libnoscrypt
     GIT_REPOSITORY git@github.com:VnUgE/noscrypt.git
-    GIT_TAG 872c49d1925b2576f85ec2587747119e895a675b
+    GIT_TAG d09d9330415d463ca19be9394b02ce11b3366f7e
 )
 FetchContent_MakeAvailable(libnoscrypt)
+
+FetchContent_GetProperties(libnoscrypt)
+include_directories(${libnoscrypt_SOURCE_DIR}/include)
 
 set_target_properties(noscrypt PROPERTIES CRYPTO_LIB openssl)
 
 #======== Build the project ========#
 set(INCLUDE_DIR ./include)
 set(CLIENT_INCLUDE_DIR ./include/client)
+set(DATA_INCLUDE_DIR ./include/data)
+set(SIGNER_INCLUDE_DIR ./include/signer)
 include_directories(${INCLUDE_DIR})
 include_directories(${CLIENT_INCLUDE_DIR})
+include_directories(${DATA_INCLUDE_DIR})
+include_directories(${SIGNER_INCLUDE_DIR})
 
 set(HEADERS
     ${INCLUDE_DIR}/nostr.hpp
     ${CLIENT_INCLUDE_DIR}/web_socket_client.hpp
+    ${DATA_INCLUDE_DIR}/data.hpp
+    ${SIGNER_INCLUDE_DIR}/signer.hpp
 )
 
 set(SOURCE_DIR ./src)
 set(CLIENT_SOURCE_DIR ./src/client)
+set(DATA_SOURCE_DIR ./src/data)
+set(SIGNER_SOURCE_DIR ./src/signer)
 set(SOURCES
-    ${SOURCE_DIR}/event.cpp
-    ${SOURCE_DIR}/filters.cpp
     ${SOURCE_DIR}/nostr_service.cpp
     ${CLIENT_SOURCE_DIR}/websocketpp_client.cpp
+    ${DATA_SOURCE_DIR}/event.cpp
+    ${DATA_SOURCE_DIR}/filters.cpp
+    ${SIGNER_SOURCE_DIR}/noscrypt_signer.cpp
 )
 
 add_library(aedile ${SOURCES} ${HEADERS})
@@ -87,6 +99,7 @@ target_link_libraries(aedile PRIVATE
     OpenSSL::Crypto
     plog::plog
     websocketpp::websocketpp
+    noscrypt
 )
 set_target_properties(aedile PROPERTIES WINDOWS_EXPORT_ALL_SYMBOLS YES)
 
@@ -111,12 +124,12 @@ set(TEST_SOURCES
 
 add_executable(aedile_test ${TEST_SOURCES} ${HEADERS})
 target_link_libraries(aedile_test PRIVATE
-    aedile
     GTest::gmock
     GTest::gtest
     GTest::gtest_main
     plog::plog
     websocketpp::websocketpp
+    aedile
 )
 set_target_properties(aedile_test PROPERTIES WINDOWS_EXPORT_ALL_SYMBOLS YES)
 
