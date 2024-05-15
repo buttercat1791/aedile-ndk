@@ -1,5 +1,9 @@
 cmake_minimum_required(VERSION 3.19)
-cmake_policy(SET CMP0135 NEW)
+
+if(CMAKE_VERSION VERSION_GREATER "3.24.0")
+  # FIXME this policy isn't compatible with versions prior to 3.24
+  cmake_policy(SET CMP0135 NEW)
+endif()
 project(aedile VERSION 0.0.2)
 
 include(ExternalProject)
@@ -39,27 +43,18 @@ find_package(plog CONFIG REQUIRED)
 find_package(websocketpp CONFIG REQUIRED)
 
 #======== Configure uuid_v4 ========#
+
 FetchContent_Declare(
     uuid_v4
     GIT_REPOSITORY git@github.com:crashoz/uuid_v4.git
     GIT_TAG v1.0.0
 )
-FetchContent_Populate(uuid_v4)
-set(uuid_v4_INCLUDE_DIR ${CMAKE_SOURCE_DIR}/_deps/uuid_v4-src/)
-
-find_path(uuid_v4_INCLUDE_DIR uuid_v4.h)
-include_directories(${uuid_v4_INCLUDE_DIR})
+FetchContent_MakeAvailable(uuid_v4)
 
 #======== Build the project ========#
-set(INCLUDE_DIR ./include)
-set(CLIENT_INCLUDE_DIR ./include/client)
-include_directories(${INCLUDE_DIR})
-include_directories(${CLIENT_INCLUDE_DIR})
-
-set(HEADERS
-    ${INCLUDE_DIR}/nostr.hpp
-    ${CLIENT_INCLUDE_DIR}/web_socket_client.hpp
-)
+list(APPEND INCLUDE_DIR ./include)
+list(APPEND INCLUDE_DIR ./include/client)
+list(APPEND INCLUDE_DIR ${CMAKE_SOURCE_DIR}/build/linux/_deps/uuid_v4-src/)
 
 set(SOURCE_DIR ./src)
 set(CLIENT_SOURCE_DIR ./src/client)
@@ -70,7 +65,7 @@ set(SOURCES
     ${CLIENT_SOURCE_DIR}/websocketpp_client.cpp
 )
 
-add_library(aedile ${SOURCES} ${HEADERS})
+add_library(aedile ${SOURCES})
 target_link_libraries(aedile PRIVATE
     nlohmann_json::nlohmann_json
     OpenSSL::SSL
@@ -78,6 +73,7 @@ target_link_libraries(aedile PRIVATE
     plog::plog
     websocketpp::websocketpp
 )
+target_include_directories(aedile PUBLIC ${INCLUDE_DIR})
 set_target_properties(aedile PROPERTIES WINDOWS_EXPORT_ALL_SYMBOLS YES)
 
 #======== Build the tests ========#
@@ -108,6 +104,7 @@ target_link_libraries(aedile_test PRIVATE
     plog::plog
     websocketpp::websocketpp
 )
+target_include_directories(aedile_test PUBLIC ${INCLUDE_DIR})
 set_target_properties(aedile_test PROPERTIES WINDOWS_EXPORT_ALL_SYMBOLS YES)
 
 gtest_add_tests(TARGET aedile_test)
