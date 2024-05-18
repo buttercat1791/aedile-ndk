@@ -8,7 +8,7 @@ namespace nostr
 {
 namespace signer
 {
-class NoscryptSigner : public ISigner
+class NoscryptSigner : public INostrConnectSigner
 {
 public:
     void receiveConnection(string connectionToken) override
