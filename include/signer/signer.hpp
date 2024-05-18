@@ -1,5 +1,10 @@
 #pragma once
 
+#include <algorithm>
+#include <random>
+
+#include <plog/Init.h>
+
 #include "data/data.hpp"
 
 namespace nostr
@@ -22,6 +27,7 @@ public:
 
 class INostrConnectSigner : public ISigner
 {
+public:
     virtual void receiveConnection(std::string connectionToken) = 0;
 
     virtual void initiateConnection(

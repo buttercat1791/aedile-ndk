@@ -35,20 +35,6 @@ public:
 class FakeSigner : public signer::ISigner 
 {
 public:
-    void receiveConnection(string connectionToken) override
-    {
-        // Do nothing.
-    };
-
-    void initiateConnection(
-        string relay,
-        string name,
-        string url,
-        string description) override
-    {
-        // Do nothing.
-    };
-
     void sign(shared_ptr<nostr::data::Event> event) override
     {
         event->sig = "fake_signature";
