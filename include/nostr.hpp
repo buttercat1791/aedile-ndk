@@ -23,6 +23,8 @@ namespace nostr
 {
 class NostrService;
 
+// TODO: Create custom exception types for the nostr namespace.
+
 class NostrService
 {
 public:

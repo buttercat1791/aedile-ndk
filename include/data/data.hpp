@@ -13,6 +13,9 @@ namespace nostr
 {
 namespace data
 {
+class Event;
+class Filters;
+
 /**
  * @brief A Nostr event.
  * @remark All data transmitted over the Nostr protocol is encoded in JSON blobs.  This struct

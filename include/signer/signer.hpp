@@ -2,6 +2,8 @@
 
 #include <algorithm>
 #include <random>
+#include <sstream>
+#include <tuple>
 
 #include <plog/Init.h>
 #include <plog/Log.h>
@@ -12,6 +14,9 @@ namespace nostr
 {
 namespace signer
 {
+class ISigner;
+class INostrConnectSigner;
+
 /**
  * @brief An interface for Nostr event signing that implements NIP-46.
  */

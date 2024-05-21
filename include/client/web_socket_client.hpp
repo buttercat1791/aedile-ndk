@@ -10,6 +10,8 @@ namespace nostr
 {
 namespace client
 {
+class IWebSocketClient;
+
 /**
  * @brief An interface for a WebSocket client singleton.
  */
