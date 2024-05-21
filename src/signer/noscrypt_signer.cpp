@@ -18,14 +18,16 @@ public:
 
         // Set up the noscrypt library.
         this->context = make_shared<NCContext>();
-        uint8_t randomEntropy[NC_CONTEXT_ENTROPY_SIZE];
+        auto contextStructSize = NCGetContextStructSize();
+        unique_ptr<uint8_t[]> randomEntropy(new uint8_t[contextStructSize]);
 
         random_device device;
         mt19937 seed(device());
         uniform_int_distribution<int> distribution(1, NC_CONTEXT_ENTROPY_SIZE);
-        generate_n(randomEntropy, NC_CONTEXT_ENTROPY_SIZE, [&]() { return distribution(seed); });
+        generate_n(randomEntropy.get(), NC_CONTEXT_ENTROPY_SIZE, [&]() { return distribution(seed); });
 
-        NCInitContext(context.get(), randomEntropy);
+        NCResult result = NCInitContext(context.get(), randomEntropy.get());
+        this->handleNoscryptInitResult(result);
     };
 
     ~NoscryptSigner()
@@ -54,6 +56,35 @@ public:
 
 private:
     shared_ptr<NCContext> context;
+
+    void handleNoscryptInitResult(NCResult result)
+    {
+        switch (result) {
+        case NC_SUCCESS:
+            PLOG_INFO << "Successfully initialized noscrypt.";
+            break;
+        
+        case E_NULL_PTR:
+            PLOG_ERROR << "Failed to initialize noscrypt: A null pointer was passed to the initializer.";
+            break;
+
+        case E_INVALID_ARG:
+            PLOG_ERROR << "Failed to initialize noscrypt: An invalid argument was passed to the initializer.";
+            break;
+        
+        case E_INVALID_CONTEXT:
+            PLOG_ERROR << "Failed to initialize noscrypt: The NCContext struct is in an invalid state.";
+            break;
+
+        case E_ARGUMENT_OUT_OF_RANGE:
+            PLOG_ERROR << "Failed to initialize noscrypt: An initializer argument was outside the range of acceptable values.";
+            break;
+
+        case E_OPERATION_FAILED:
+            PLOG_ERROR << "Failed to initialize noscrypt.";
+            break;
+        }
+    };
 };
 } // namespace signer
 } // namespace nostr

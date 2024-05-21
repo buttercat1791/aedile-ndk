@@ -4,6 +4,7 @@
 #include <random>
 
 #include <plog/Init.h>
+#include <plog/Log.h>
 
 #include "data/data.hpp"
 
