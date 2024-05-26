@@ -88,12 +88,6 @@ void Event::validate()
     {
         throw std::invalid_argument("Event::validate: A valid event kind is required.");
     }
-
-    bool hasSignature = this->sig.length() > 0;
-    if (!hasSignature)
-    {
-        throw std::invalid_argument("Event::validate: The event must be signed.");
-    }
 };
 
 string Event::generateId(string serializedData) const

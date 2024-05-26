@@ -10,14 +10,14 @@ namespace nostr
 {
 namespace client
 {
-class IWebSocketClient;
-
 /**
  * @brief An interface for a WebSocket client singleton.
  */
 class IWebSocketClient
 {
 public:
+    virtual ~IWebSocketClient() = default;
+
     /**
      * @brief Starts the client.
      * @remark This method must be called before any other client methods.

@@ -14,15 +14,14 @@ namespace nostr
 {
 namespace signer
 {
-class ISigner;
-class INostrConnectSigner;
-
 /**
  * @brief An interface for Nostr event signing that implements NIP-46.
  */
 class ISigner
 {
 public:
+    virtual ~ISigner() = default;
+
     /**
      * @brief Signs the given Nostr event.
      * @param event The event to sign.
@@ -34,6 +33,8 @@ public:
 class INostrConnectSigner : public ISigner
 {
 public:
+    virtual ~INostrConnectSigner() = default;
+
     virtual void receiveConnection(std::string connectionToken) = 0;
 
     virtual void initiateConnection(

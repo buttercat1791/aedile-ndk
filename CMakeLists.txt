@@ -75,9 +75,12 @@ include_directories(${SIGNER_INCLUDE_DIR})
 
 set(HEADERS
     ${INCLUDE_DIR}/nostr.hpp
+    ${INCLUDE_DIR}/nostr_service_base.hpp
     ${CLIENT_INCLUDE_DIR}/web_socket_client.hpp
+    ${CLIENT_INCLUDE_DIR}/websocketpp_client.hpp
     ${DATA_INCLUDE_DIR}/data.hpp
     ${SIGNER_INCLUDE_DIR}/signer.hpp
+    ${SIGNER_INCLUDE_DIR}/noscrypt_signer.hpp
 )
 
 set(SOURCE_DIR ./src)
@@ -85,7 +88,7 @@ set(CLIENT_SOURCE_DIR ./src/client)
 set(DATA_SOURCE_DIR ./src/data)
 set(SIGNER_SOURCE_DIR ./src/signer)
 set(SOURCES
-    ${SOURCE_DIR}/nostr_service.cpp
+    ${SOURCE_DIR}/nostr_service_base.cpp
     ${CLIENT_SOURCE_DIR}/websocketpp_client.cpp
     ${DATA_SOURCE_DIR}/event.cpp
     ${DATA_SOURCE_DIR}/filters.cpp
@@ -104,33 +107,37 @@ target_link_libraries(aedile PRIVATE
 set_target_properties(aedile PROPERTIES WINDOWS_EXPORT_ALL_SYMBOLS YES)
 
 #======== Build the tests ========#
-enable_testing()
-include(GoogleTest)
+if(AEDILE_INCLUDE_TESTS)
+    message(STATUS "Building unit tests.")
 
-FetchContent_Declare(
-  googletest
-  URL https://github.com/google/googletest/archive/03597a01ee50ed33e9dfd640b249b4be3799d395.zip
-)
+    enable_testing()
+    include(GoogleTest)
 
-set(gtest_force_shared_crt ON CACHE BOOL "" FORCE)
-FetchContent_MakeAvailable(googletest)
+    FetchContent_Declare(
+    googletest
+    URL https://github.com/google/googletest/archive/03597a01ee50ed33e9dfd640b249b4be3799d395.zip
+    )
 
-enable_testing()
+    set(gtest_force_shared_crt ON CACHE BOOL "" FORCE)
+    FetchContent_MakeAvailable(googletest)
 
-set(TEST_DIR ./test)
-set(TEST_SOURCES
-    ${TEST_DIR}/nostr_service_test.cpp
-)
+    enable_testing()
 
-add_executable(aedile_test ${TEST_SOURCES} ${HEADERS})
-target_link_libraries(aedile_test PRIVATE
-    GTest::gmock
-    GTest::gtest
-    GTest::gtest_main
-    plog::plog
-    websocketpp::websocketpp
-    aedile
-)
-set_target_properties(aedile_test PROPERTIES WINDOWS_EXPORT_ALL_SYMBOLS YES)
+    set(TEST_DIR ./test)
+    set(TEST_SOURCES
+        ${TEST_DIR}/nostr_service_base_test.cpp
+    )
 
-gtest_add_tests(TARGET aedile_test)
+    add_executable(aedile_test ${TEST_SOURCES} ${HEADERS})
+    target_link_libraries(aedile_test PRIVATE
+        GTest::gmock
+        GTest::gtest
+        GTest::gtest_main
+        plog::plog
+        websocketpp::websocketpp
+        aedile
+    )
+    set_target_properties(aedile_test PROPERTIES WINDOWS_EXPORT_ALL_SYMBOLS YES)
+
+    gtest_add_tests(TARGET aedile_test)
+endif()

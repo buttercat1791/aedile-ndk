@@ -21,52 +21,35 @@
 
 namespace nostr
 {
-class NostrService;
-
 // TODO: Create custom exception types for the nostr namespace.
 
-class NostrService
+class INostrServiceBase
 {
 public:
-    NostrService(
-        std::shared_ptr<plog::IAppender> appender,
-        std::shared_ptr<client::IWebSocketClient> client,
-        std::shared_ptr<signer::ISigner> signer);
-    NostrService(
-        std::shared_ptr<plog::IAppender> appender,
-        std::shared_ptr<client::IWebSocketClient> client,
-        std::shared_ptr<signer::ISigner> signer,
-        std::vector<std::string> relays);
-    ~NostrService();
-
-    std::vector<std::string> defaultRelays() const;
-
-    std::vector<std::string> activeRelays() const;
-
-    std::unordered_map<std::string, std::vector<std::string>> subscriptions() const;
+    virtual ~INostrServiceBase() = default;
 
     /**
      * @brief Opens connections to the default Nostr relays of the instance, as specified in
      * the constructor.
      * @return A list of the relay URLs to which connections were successfully opened.
      */
-    std::vector<std::string> openRelayConnections();
+    virtual std::vector<std::string> openRelayConnections() = 0;
 
     /**
      * @brief Opens connections to the specified Nostr relays.
      * @returns A list of the relay URLs to which connections were successfully opened.
      */
-    std::vector<std::string> openRelayConnections(std::vector<std::string> relays);
+    virtual std::vector<std::string> openRelayConnections(std::vector<std::string> relays) = 0;
 
     /**
      * @brief Closes all open relay connections.
      */
-    void closeRelayConnections();
+    virtual void closeRelayConnections() = 0;
 
     /**
      * @brief Closes any open connections to the specified Nostr relays.
      */
-    void closeRelayConnections(std::vector<std::string> relays);
+    virtual void closeRelayConnections(std::vector<std::string> relays) = 0;
     
     /**
      * @brief Publishes a Nostr event to all open relay connections.
@@ -74,7 +57,8 @@ public:
      * to which relays the event was published successfully, and to which relays the event failed
      * to publish.
      */
-    std::tuple<std::vector<std::string>, std::vector<std::string>> publishEvent(std::shared_ptr<data::Event> event);
+    virtual std::tuple<std::vector<std::string>, std::vector<std::string>> publishEvent(
+        std::shared_ptr<data::Event> event) = 0;
 
     /**
      * @brief Queries all open relay connections for events matching the given set of filters, and
@@ -88,7 +72,8 @@ public:
      * set on the filters in the range 1-64, inclusive.  If no valid limit is given, it will be
      * defaulted to 16.
      */
-    std::vector<std::shared_ptr<data::Event>> queryRelays(std::shared_ptr<data::Filters> filters);
+    virtual std::vector<std::shared_ptr<data::Event>> queryRelays(
+        std::shared_ptr<data::Filters> filters) = 0;
 
     /**
      * @brief Queries all open relay connections for events matching the given set of filters.
@@ -104,11 +89,11 @@ public:
      * events returned from the relay for the given filters.  The service will not store the
      * events, and they will not be accessible via `getNewEvents`.
      */
-    std::string queryRelays(
+    virtual std::string queryRelays(
         std::shared_ptr<data::Filters> filters,
         std::function<void(const std::string&, std::shared_ptr<data::Event>)> eventHandler,
         std::function<void(const std::string&)> eoseHandler,
-        std::function<void(const std::string&, const std::string&)> closeHandler);
+        std::function<void(const std::string&, const std::string&)> closeHandler) = 0;
     
     /**
      * @brief Closes the subscription with the given ID on all open relay connections.
@@ -116,7 +101,8 @@ public:
      * to which relays the message was sent successfully, and which relays failed to receive the
      * message.
      */
-    std::tuple<std::vector<std::string>, std::vector<std::string>> closeSubscription(std::string subscriptionId);
+    virtual std::tuple<std::vector<std::string>, std::vector<std::string>> closeSubscription(
+        std::string subscriptionId) = 0;
 
     /**
      * @brief Closes the subscription with the given ID on the given relay.
@@ -124,119 +110,12 @@ public:
      * @remark If the subscription does not exist on the given relay, or if the relay is not
      * connected, the method will do nothing and return false.
      */
-    bool closeSubscription(std::string subscriptionId, std::string relay);
+    virtual bool closeSubscription(std::string subscriptionId, std::string relay) = 0;
 
     /**
      * @brief Closes all open subscriptions on all open relay connections.
      * @returns A list of any subscription IDs that failed to close.
      */
-    std::vector<std::string> closeSubscriptions();
-
-    /**
-     * @brief Closes all open subscriptions on the given relays.
-     * @returns A list of any subscription IDs that failed to close.
-     */
-    std::vector<std::string> closeSubscriptions(std::vector<std::string> relays);
-
-private:
-    ///< The maximum number of events the service will store for each subscription.
-    const int MAX_EVENTS_PER_SUBSCRIPTION = 128;
-
-    ///< The WebSocket client used to communicate with relays.
-    std::shared_ptr<client::IWebSocketClient> _client;
-    ///< The signer used to sign Nostr events.
-    std::shared_ptr<signer::ISigner> _signer;
-
-    ///< A mutex to protect the instance properties.
-    std::mutex _propertyMutex;
-    ///< The default set of Nostr relays to which the service will attempt to connect.
-    std::vector<std::string> _defaultRelays;
-    ///< The set of Nostr relays to which the service is currently connected.
-    std::vector<std::string> _activeRelays; 
-    ///< A map from subscription IDs to the relays on which each subscription is open.
-    std::unordered_map<std::string, std::vector<std::string>> _subscriptions;
-
-    /**
-     * @brief Determines which of the given relays are currently connected.
-     * @returns A list of the URIs of currently-open relay connections from the given list.
-     */
-    std::vector<std::string> getConnectedRelays(std::vector<std::string> relays);
-
-    /**
-     * @brief Determines which of the given relays are not currently connected.
-     * @returns A list of the URIs of currently-unconnected relays from the given list.
-     */
-    std::vector<std::string> getUnconnectedRelays(std::vector<std::string> relays);
-
-    /**
-     * @brief Determines whether the given relay is currently connected.
-     * @returns True if the relay is connected, false otherwise.
-     */
-    bool isConnected(std::string relay);
-
-    /**
-     * @brief Removes the given relay from the instance's list of active relays.
-     */
-    void eraseActiveRelay(std::string relay);
-
-    /**
-     * @brief Opens a connection from the client to the given relay.
-     */
-    void connect(std::string relay);
-
-    /**
-     * @brief Closes the connection from the client to the given relay.
-     */
-    void disconnect(std::string relay);
-
-    /**
-     * @brief Generates a unique subscription ID that may be used to identify event requests.
-     * @returns A stringified UUID.
-     */
-    std::string generateSubscriptionId();
-
-    /**
-     * @brief Generates a message requesting a relay to close the subscription with the given ID.
-     * @returns A stringified JSON object representing the close request.
-     */
-    std::string generateCloseRequest(std::string subscriptionId);
-
-    /**
-     * @brief Indicates whether the the service has an open subscription with the given ID.
-     * @returns True if the service has the subscription, false otherwise.
-     */
-    bool hasSubscription(std::string subscriptionId);
-
-    /**
-     * @brief Indicates whether the service has an open subscription with the given ID on the given
-     * relay.
-     * @returns True if the subscription exists on the relay, false otherwise.
-     */
-    bool hasSubscription(std::string subscriptionId, std::string relay);
-
-    /**
-     * @brief Parses EVENT messages received from the relay and invokes the given event handler.
-     * @param message The raw message received from the relay.
-     * @param eventHandler A callable object that will be invoked with the subscription ID and the
-     * payload of the event.
-     * @param eoseHandler A callable object that will be invoked with the subscription ID when the
-     * relay sends an EOSE message, indicating it has reached the end of stored events for the
-     * given query.
-     * @param closeHandler A callable object that will be invoked with the subscription ID and the
-     * message sent by the relay if the subscription is ended by the relay.
-     */
-    void onSubscriptionMessage(
-        std::string message,
-        std::function<void(const std::string&, std::shared_ptr<data::Event>)> eventHandler,
-        std::function<void(const std::string&)> eoseHandler,
-        std::function<void(const std::string&, const std::string&)> closeHandler);
-    
-    /**
-     * @brief Parses OK messages received from the relay and invokes the given acceptance handler.
-     * @remark The OK message type is sent to indicate whether the relay has accepted an event sent
-     * by the client.  Note that this is distinct from whether the message was successfully sent to
-     * the relay over the WebSocket connection.
-     */
-    void onAcceptance(std::string message, std::function<void(const bool)> acceptanceHandler);
+    virtual std::vector<std::string> closeSubscriptions() = 0;
 };
 } // namespace nostr

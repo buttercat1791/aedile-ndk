@@ -9,6 +9,16 @@
           "CMAKE_BUILD_TYPE": "Release",
           "CMAKE_TOOLCHAIN_FILE": "$env{VCPKG_ROOT}/scripts/buildsystems/vcpkg.cmake"
         }
+      },
+      {
+        "name": "linux tests",
+        "generator": "Unix Makefiles",
+        "binaryDir": "${sourceDir}/build/linux",
+        "cacheVariables": {
+          "CMAKE_BUILD_TYPE": "Release",
+          "CMAKE_TOOLCHAIN_FILE": "$env{VCPKG_ROOT}/scripts/buildsystems/vcpkg.cmake",
+          "AEDILE_INCLUDE_TESTS": "ON"
+        }
       }
     ],
     "buildPresets": [
@@ -16,12 +26,17 @@
         "name": "linux",
         "configurePreset": "linux",
         "jobs": 4
+      },
+      {
+        "name": "linux tests",
+        "configurePreset": "linux tests",
+        "jobs": 4
       }
     ],
     "testPresets": [
       {
         "name": "linux",
-        "configurePreset": "linux"
+        "configurePreset": "linux tests"
       }
     ]
   }
