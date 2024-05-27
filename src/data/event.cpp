@@ -1,13 +1,12 @@
+#include <sstream>
+#include <stdexcept>
+
 #include "data/data.hpp"
 
 using namespace nlohmann;
 using namespace std;
 
-namespace nostr
-{
-namespace data
-{
-string Event::serialize()
+string nostr::data::Event::serialize()
 {
     try
     {
@@ -31,7 +30,7 @@ string Event::serialize()
     return j.dump();
 };
 
-Event Event::fromString(string jstr)
+nostr::data::Event nostr::data::Event::fromString(string jstr)
 {
     json j = json::parse(jstr);
     Event event;
@@ -48,7 +47,7 @@ Event Event::fromString(string jstr)
     return event;
 };
 
-Event Event::fromJson(json j)
+nostr::data::Event nostr::data::Event::fromJson(json j)
 {
     Event event;
 
@@ -69,7 +68,7 @@ Event Event::fromJson(json j)
     return event;
 };
 
-void Event::validate()
+void nostr::data::Event::validate()
 {
     bool hasPubkey = this->pubkey.length() > 0;
     if (!hasPubkey)
@@ -90,7 +89,7 @@ void Event::validate()
     }
 };
 
-string Event::generateId(string serializedData) const
+string nostr::data::Event::generateId(string serializedData) const
 {
     unsigned char hash[SHA256_DIGEST_LENGTH];
     EVP_Digest(serializedData.c_str(), serializedData.length(), hash, NULL, EVP_sha256(), NULL);
@@ -104,7 +103,7 @@ string Event::generateId(string serializedData) const
     return ss.str();
 };
 
-bool Event::operator==(const Event& other) const
+bool nostr::data::Event::operator==(const Event& other) const
 {
     if (this->id.empty())
     {
@@ -117,5 +116,3 @@ bool Event::operator==(const Event& other) const
 
     return this->id == other.id;
 };
-} // namespace data
-} // namespace nostr

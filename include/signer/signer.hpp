@@ -1,12 +1,7 @@
 #pragma once
 
-#include <algorithm>
-#include <random>
-#include <sstream>
-#include <tuple>
-
-#include <plog/Init.h>
-#include <plog/Log.h>
+#include <memory>
+#include <string>
 
 #include "data/data.hpp"
 

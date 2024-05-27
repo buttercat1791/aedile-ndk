@@ -67,6 +67,7 @@ set_target_properties(noscrypt PROPERTIES CRYPTO_LIB openssl)
 set(INCLUDE_DIR ./include)
 set(CLIENT_INCLUDE_DIR ./include/client)
 set(DATA_INCLUDE_DIR ./include/data)
+set(SERVICE_INCLUDE_DIR ./include/service)
 set(SIGNER_INCLUDE_DIR ./include/signer)
 include_directories(${INCLUDE_DIR})
 include_directories(${CLIENT_INCLUDE_DIR})
@@ -75,10 +76,10 @@ include_directories(${SIGNER_INCLUDE_DIR})
 
 set(HEADERS
     ${INCLUDE_DIR}/nostr.hpp
-    ${INCLUDE_DIR}/nostr_service_base.hpp
     ${CLIENT_INCLUDE_DIR}/web_socket_client.hpp
     ${CLIENT_INCLUDE_DIR}/websocketpp_client.hpp
     ${DATA_INCLUDE_DIR}/data.hpp
+    ${SERVICE_INCLUDE_DIR}/nostr_service_base.hpp
     ${SIGNER_INCLUDE_DIR}/signer.hpp
     ${SIGNER_INCLUDE_DIR}/noscrypt_signer.hpp
 )
@@ -86,12 +87,13 @@ set(HEADERS
 set(SOURCE_DIR ./src)
 set(CLIENT_SOURCE_DIR ./src/client)
 set(DATA_SOURCE_DIR ./src/data)
+set(SERVICE_SOURCE_DIR ./src/service)
 set(SIGNER_SOURCE_DIR ./src/signer)
 set(SOURCES
-    ${SOURCE_DIR}/nostr_service_base.cpp
     ${CLIENT_SOURCE_DIR}/websocketpp_client.cpp
     ${DATA_SOURCE_DIR}/event.cpp
     ${DATA_SOURCE_DIR}/filters.cpp
+    ${SERVICE_SOURCE_DIR}/nostr_service_base.cpp
     ${SIGNER_SOURCE_DIR}/noscrypt_signer.cpp
 )
 

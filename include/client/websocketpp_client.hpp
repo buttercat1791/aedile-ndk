@@ -1,6 +1,13 @@
 #pragma once
 
-#include "web_socket_client.hpp"
+#include <mutex>
+#include <unordered_map>
+#include <tuple>
+
+#include <websocketpp/client.hpp>
+#include <websocketpp/config/asio_client.hpp>
+
+#include "client/web_socket_client.hpp"
 
 namespace nostr
 {

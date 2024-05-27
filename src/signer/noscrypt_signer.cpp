@@ -1,8 +1,15 @@
-#include "noscrypt_signer.hpp"
+#include <algorithm>
+#include <random>
+#include <sstream>
+#include <tuple>
+
+#include "signer/noscrypt_signer.hpp"
 
 using namespace std;
 
-nostr::signer::NoscryptSigner::NoscryptSigner(shared_ptr<plog::IAppender> appender)
+nostr::signer::NoscryptSigner::NoscryptSigner(
+    shared_ptr<plog::IAppender> appender,
+    shared_ptr<nostr::service::INostrServiceBase> nostrService)
 {
     plog::init(plog::debug, appender.get());
 

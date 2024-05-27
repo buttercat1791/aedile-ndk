@@ -1,11 +1,15 @@
 #pragma once
 
+#include <plog/Init.h>
+#include <plog/Log.h>
+
 extern "C"
 {
 #include <noscrypt.h>
 }
 
-#include "signer.hpp"
+#include "service/nostr_service_base.hpp"
+#include "signer/signer.hpp"
 
 namespace nostr
 {
@@ -14,7 +18,9 @@ namespace signer
 class NoscryptSigner : public INostrConnectSigner
 {
 public:
-    NoscryptSigner(std::shared_ptr<plog::IAppender> appender);
+    NoscryptSigner(
+        std::shared_ptr<plog::IAppender> appender,
+        std::shared_ptr<nostr::service::INostrServiceBase> nostrService);
 
     ~NoscryptSigner();
 

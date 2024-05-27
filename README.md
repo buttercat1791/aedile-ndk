@@ -33,11 +33,12 @@ The SDK aims to support Linux, Windows, and macOS build targets.  It currently s
 To build the SDK on Linux, run the following commands from the project root:
 
 ```bash
-cmake --build --preset linux
+cmake --build --preset="linux"
 ```
 
-To run unit tests, use the following command:
+To run unit tests, use the following commands:
 
 ```bash
-ctest --preset linux
+cmake --build --preset="linux tests"
+ctest --preset="linux"
 ```

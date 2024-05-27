@@ -3,9 +3,6 @@
 #include <functional>
 #include <string>
 
-#include <websocketpp/client.hpp>
-#include <websocketpp/config/asio_client.hpp>
-
 namespace nostr
 {
 namespace client

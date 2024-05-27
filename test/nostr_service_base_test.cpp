@@ -1,4 +1,5 @@
 #include <chrono>
+#include <future>
 #include <iostream>
 
 #include <gmock/gmock.h>
@@ -8,9 +9,7 @@
 #include <plog/Formatters/TxtFormatter.h>
 #include <websocketpp/client.hpp>
 
-#include "nostr.hpp"
-#include "nostr_service_base.hpp"
-#include "client/web_socket_client.hpp"
+#include "service/nostr_service_base.hpp"
 
 using namespace nostr;
 using namespace std;
@@ -170,12 +169,12 @@ TEST_F(NostrServiceBaseTest, Constructor_StartsClient)
 {
     EXPECT_CALL(*mockClient, start()).Times(1);
 
-    auto nostrService = make_unique<nostr::NostrServiceBase>(testAppender, mockClient);
+    auto nostrService = make_unique<nostr::service::NostrServiceBase>(testAppender, mockClient);
 };
 
 TEST_F(NostrServiceBaseTest, Constructor_InitializesService_WithNoDefaultRelays)
 {
-    auto nostrService = make_unique<nostr::NostrServiceBase>(testAppender, mockClient);
+    auto nostrService = make_unique<nostr::service::NostrServiceBase>(testAppender, mockClient);
     auto defaultRelays = nostrService->defaultRelays();
     auto activeRelays = nostrService->activeRelays();
 
@@ -185,7 +184,7 @@ TEST_F(NostrServiceBaseTest, Constructor_InitializesService_WithNoDefaultRelays)
 
 TEST_F(NostrServiceBaseTest, Constructor_InitializesService_WithProvidedDefaultRelays)
 {
-    auto nostrService = make_unique<nostr::NostrServiceBase>(
+    auto nostrService = make_unique<nostr::service::NostrServiceBase>(
         testAppender,
         mockClient,
         defaultTestRelays);
@@ -204,7 +203,7 @@ TEST_F(NostrServiceBaseTest, Destructor_StopsClient)
 {
     EXPECT_CALL(*mockClient, start()).Times(1);
 
-    auto nostrService = make_unique<nostr::NostrServiceBase>(
+    auto nostrService = make_unique<nostr::service::NostrServiceBase>(
         testAppender,
         mockClient);
 };
@@ -231,7 +230,7 @@ TEST_F(NostrServiceBaseTest, OpenRelayConnections_OpensConnections_ToDefaultRela
             return status;
         }));
     
-    auto nostrService = make_unique<nostr::NostrServiceBase>(
+    auto nostrService = make_unique<nostr::service::NostrServiceBase>(
         testAppender,
         mockClient,
         defaultTestRelays);
@@ -269,7 +268,7 @@ TEST_F(NostrServiceBaseTest, OpenRelayConnections_OpensConnections_ToProvidedRel
             return status;
         }));
 
-    auto nostrService = make_unique<nostr::NostrServiceBase>(
+    auto nostrService = make_unique<nostr::service::NostrServiceBase>(
         testAppender,
         mockClient,
         defaultTestRelays);
@@ -309,7 +308,7 @@ TEST_F(NostrServiceBaseTest, OpenRelayConnections_AddsOpenConnections_ToActiveRe
             return status;
         }));
 
-    auto nostrService = make_unique<nostr::NostrServiceBase>(
+    auto nostrService = make_unique<nostr::service::NostrServiceBase>(
         testAppender,
         mockClient,
         defaultTestRelays);
@@ -355,7 +354,7 @@ TEST_F(NostrServiceBaseTest, CloseRelayConnections_ClosesConnections_ToActiveRel
             return status;
         }));
 
-    auto nostrService = make_unique<nostr::NostrServiceBase>(
+    auto nostrService = make_unique<nostr::service::NostrServiceBase>(
         testAppender,
         mockClient,
         defaultTestRelays);
@@ -393,7 +392,7 @@ TEST_F(NostrServiceBaseTest, CloseRelayConnections_RemovesClosedConnections_From
             return status;
         }));
 
-    auto nostrService = make_unique<nostr::NostrServiceBase>(
+    auto nostrService = make_unique<nostr::service::NostrServiceBase>(
         testAppender,
         mockClient,
         allTestRelays);
@@ -434,7 +433,7 @@ TEST_F(NostrServiceBaseTest, PublishEvent_CorrectlyIndicates_AllSuccesses)
             return status;
         }));
 
-    auto nostrService = make_unique<nostr::NostrServiceBase>(
+    auto nostrService = make_unique<nostr::service::NostrServiceBase>(
         testAppender,
         mockClient,
         defaultTestRelays);
@@ -484,7 +483,7 @@ TEST_F(NostrServiceBaseTest, PublishEvent_CorrectlyIndicates_AllFailures)
             return status;
         }));
 
-    auto nostrService = make_unique<nostr::NostrServiceBase>(
+    auto nostrService = make_unique<nostr::service::NostrServiceBase>(
         testAppender,
         mockClient,
         defaultTestRelays);
@@ -529,7 +528,7 @@ TEST_F(NostrServiceBaseTest, PublishEvent_CorrectlyIndicates_MixedSuccessesAndFa
             return status;
         }));
 
-    auto nostrService = make_unique<nostr::NostrServiceBase>(
+    auto nostrService = make_unique<nostr::service::NostrServiceBase>(
         testAppender,
         mockClient,
         defaultTestRelays);
@@ -585,7 +584,7 @@ TEST_F(NostrServiceBaseTest, PublishEvent_CorrectlyIndicates_RejectedEvent)
             return status;
         }));
 
-    auto nostrService = make_unique<nostr::NostrServiceBase>(
+    auto nostrService = make_unique<nostr::service::NostrServiceBase>(
         testAppender,
         mockClient,
         defaultTestRelays);
@@ -634,7 +633,7 @@ TEST_F(NostrServiceBaseTest, PublishEvent_CorrectlyIndicates_EventRejectedBySome
             return status;
         }));
 
-    auto nostrService = make_unique<nostr::NostrServiceBase>(
+    auto nostrService = make_unique<nostr::service::NostrServiceBase>(
         testAppender,
         mockClient,
         defaultTestRelays);
@@ -696,7 +695,7 @@ TEST_F(NostrServiceBaseTest, QueryRelays_ReturnsEvents_UpToEOSE)
             return status;
         }));
 
-    auto nostrService = make_unique<nostr::NostrServiceBase>(
+    auto nostrService = make_unique<nostr::service::NostrServiceBase>(
         testAppender,
         mockClient,
         defaultTestRelays);
@@ -788,7 +787,7 @@ TEST_F(NostrServiceBaseTest, QueryRelays_CallsHandler_WithReturnedEvents)
             return status;
         }));
 
-    auto nostrService = make_unique<nostr::NostrServiceBase>(
+    auto nostrService = make_unique<nostr::service::NostrServiceBase>(
         testAppender,
         mockClient,
         defaultTestRelays);
@@ -904,7 +903,7 @@ TEST_F(NostrServiceBaseTest, Service_MaintainsMultipleSubscriptions_ThenClosesAl
             return status;
         }));
 
-    auto nostrService = make_unique<nostr::NostrServiceBase>(
+    auto nostrService = make_unique<nostr::service::NostrServiceBase>(
         testAppender,
         mockClient,
         testRelays);

@@ -1,13 +1,11 @@
+#include <stdexcept>
+
 #include "data/data.hpp"
 
 using namespace nlohmann;
 using namespace std;
 
-namespace nostr
-{
-namespace data
-{
-string Filters::serialize(string& subscriptionId)
+string nostr::data::Filters::serialize(string& subscriptionId)
 {
     try
     {
@@ -40,7 +38,7 @@ string Filters::serialize(string& subscriptionId)
     return jarr.dump();
 };
 
-void Filters::validate()
+void nostr::data::Filters::validate()
 {
     bool hasLimit = this->limit > 0;
     if (!hasLimit)
@@ -66,5 +64,3 @@ void Filters::validate()
         throw invalid_argument("Filters::validate: At least one filter must be set.");
     }
 };
-} // namespace data
-} // namespace nostr
