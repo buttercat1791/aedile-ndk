@@ -34,13 +34,44 @@ void nostr::signer::NoscryptSigner::receiveConnection(string connectionToken)
     // Receive the connection token here.
 };
 
-void nostr::signer::NoscryptSigner::initiateConnection(
-    string relay,
+string nostr::signer::NoscryptSigner::initiateConnection(
+    vector<string> relays,
     string name,
     string url,
     string description)
 {
-    // Initiate the connection here.
+    // Return an empty string if the local keypair is invalid.
+    if (this->_localPrivateKey.empty() || this->_localPublicKey.empty())
+    {
+        PLOG_ERROR << "A valid local keypair is required to connect to a remote signer.";
+        return string();
+    }
+
+    // Return an empty string if no relays are provided.
+    if (relays.empty())
+    {
+        PLOG_ERROR << "At least one relay must be provided to connect to a remote signer.";
+        return string();
+    }
+
+    // Store the provided relay list to be used for sending and receving connection events.
+    this->_relays = relays;
+
+    // Generate the connection token.
+    stringstream ss;
+    ss << "nostrconnect://" << this->_localPublicKey;
+    for (int i = 0; i < relays.size(); i++)
+    {
+        ss << (i == 0 ? "?" : "&");
+        ss << "relay=" << relays[i];
+    }
+    ss << "&metadata={";
+    ss << "\"name\":\"" << name << "\",";
+    ss << "\"url\":\"" << url << "\",";
+    ss << "\"description\":\"" << description << "\"";
+    ss << "}";
+
+    return ss.str();
 };
 
 void nostr::signer::NoscryptSigner::sign(shared_ptr<data::Event> event)
@@ -63,10 +94,10 @@ shared_ptr<NCContext> nostr::signer::NoscryptSigner::_initNoscryptContext()
     uniform_int_distribution<> dist(0, contextStructSize);
     generate_n(randomEntropy.get(), contextStructSize, [&]() { return dist(gen); });
 
-    NCResult result = NCInitContext(context.get(), randomEntropy.get());
-    this->_logNoscryptInitResult(result);
+    NCResult initResult = NCInitContext(context.get(), randomEntropy.get());
+    this->_logNoscryptInitResult(initResult);
 
-    if (result != NC_SUCCESS)
+    if (initResult != NC_SUCCESS)
     {
         return nullptr;
     }
@@ -95,10 +126,10 @@ tuple<string, string> nostr::signer::NoscryptSigner::_createLocalKeypair()
     generate_n(secretKey.get()->key, NC_SEC_KEY_SIZE, [&]() { return dist(gen); });
 
     // Check the validity of the secret key.
-    NCResult result = NCValidateSecretKey(this->_noscryptContext.get(), secretKey.get());
-    this->_logNoscryptSecretKeyResult(result);
+    NCResult secretValidationResult = NCValidateSecretKey(this->_noscryptContext.get(), secretKey.get());
+    this->_logNoscryptSecretValidationResult(secretValidationResult);
 
-    if (result != NC_SUCCESS)
+    if (secretValidationResult != NC_SUCCESS)
     {
         // Return empty strings if the secret key generation fails.
         return make_tuple(string(), string());
@@ -114,13 +145,13 @@ tuple<string, string> nostr::signer::NoscryptSigner::_createLocalKeypair()
 
     // Use noscrypt to derive the public key from its private counterpart.
     unique_ptr<NCPublicKey> pubkey(new NCPublicKey);
-    NCResult result = NCGetPublicKey(
+    NCResult pubkeyGenerationResult = NCGetPublicKey(
         this->_noscryptContext.get(),
         secretKey.get(),
         pubkey.get());
-    this->_logNoscryptPublicKeyResult(result);
+    this->_logNoscryptPubkeyGenerationResult(pubkeyGenerationResult);
 
-    if (result != NC_SUCCESS)
+    if (pubkeyGenerationResult != NC_SUCCESS)
     {
         // Return empty strings if the pubkey generation fails.
         return make_tuple(string(), string());
@@ -140,9 +171,9 @@ tuple<string, string> nostr::signer::NoscryptSigner::_createLocalKeypair()
 
 #pragma region Logging
 
-void nostr::signer::NoscryptSigner::_logNoscryptInitResult(NCResult result)
+void nostr::signer::NoscryptSigner::_logNoscryptInitResult(NCResult initResult)
 {
-    switch (result) {
+    switch (initResult) {
     case NC_SUCCESS:
         PLOG_INFO << "noscrypt - success";
         break;
@@ -169,9 +200,9 @@ void nostr::signer::NoscryptSigner::_logNoscryptInitResult(NCResult result)
     }
 };
 
-void nostr::signer::NoscryptSigner::_logNoscryptSecretKeyResult(NCResult result)
+void nostr::signer::NoscryptSigner::_logNoscryptSecretValidationResult(NCResult secretValidationResult)
 {
-    switch (result) {
+    switch (secretValidationResult) {
     case NC_SUCCESS:
         PLOG_INFO << "noscrypt - success: Generated a valid secret key.";
         break;
@@ -198,9 +229,9 @@ void nostr::signer::NoscryptSigner::_logNoscryptSecretKeyResult(NCResult result)
     }
 };
 
-void nostr::signer::NoscryptSigner::_logNoscryptPublicKeyResult(NCResult result)
+void nostr::signer::NoscryptSigner::_logNoscryptPubkeyGenerationResult(NCResult pubkeyGenerationResult)
 {
-    switch (result) {
+    switch (pubkeyGenerationResult) {
     case NC_SUCCESS:
         PLOG_INFO << "noscrypt - success: Generated a valid public key.";
         break;

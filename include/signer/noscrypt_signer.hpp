@@ -26,8 +26,8 @@ public:
 
     void receiveConnection(std::string connectionToken) override;
 
-    void initiateConnection(
-        std::string relay,
+    std::string initiateConnection(
+        std::vector<std::string> relays,
         std::string name,
         std::string url,
         std::string description) override;
@@ -39,6 +39,9 @@ private:
 
     std::string _localPrivateKey;
     std::string _localPublicKey;
+
+    ///< A list of relays that will be used to connect to the remote signer.
+    std::vector<std::string> _relays;
     
     /**
      * @brief Initializes the noscrypt library context into the class's `context` property.
@@ -57,11 +60,11 @@ private:
 
     #pragma region Logging
 
-    void _logNoscryptInitResult(NCResult result);
+    void _logNoscryptInitResult(NCResult initResult);
 
-    void _logNoscryptSecretKeyResult(NCResult result);
+    void _logNoscryptSecretValidationResult(NCResult secretValidationResult);
 
-    void _logNoscryptPublicKeyResult(NCResult result);
+    void _logNoscryptPubkeyGenerationResult(NCResult pubkeyGenerationResult);
 
     #pragma endregion
 };
