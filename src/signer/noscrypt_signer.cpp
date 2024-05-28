@@ -54,7 +54,7 @@ void nostr::signer::NoscryptSigner::sign(shared_ptr<data::Event> event)
  */
 shared_ptr<NCContext> nostr::signer::NoscryptSigner::_initNoscryptContext()
 {
-    shared_ptr<NCContext> context(new NCContext);
+    shared_ptr<NCContext> context;
     auto contextStructSize = NCGetContextStructSize();
     unique_ptr<uint8_t> randomEntropy(new uint8_t[contextStructSize]);
 
