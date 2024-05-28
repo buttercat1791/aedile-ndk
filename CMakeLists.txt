@@ -1,6 +1,9 @@
 cmake_minimum_required(VERSION 3.19)
-cmake_policy(SET CMP0135 NEW)
-project(aedile VERSION 0.0.2)
+project(aedile VERSION 0.0.3)
+
+if(CMAKE_VERSION VERSION_GREATER_EQUAL "3.24")
+    cmake_policy(SET CMP0135 NEW)
+endif()
 
 include(ExternalProject)
 include(FetchContent)
@@ -54,7 +57,7 @@ include_directories(${uuid_v4_SOURCE_DIR})
 FetchContent_Declare(
     libnoscrypt
     GIT_REPOSITORY git@github.com:VnUgE/noscrypt.git
-    GIT_TAG d09d9330415d463ca19be9394b02ce11b3366f7e
+    GIT_TAG 72e1b7be4031e2fd4d258fcf434ad049c0029201
 )
 FetchContent_MakeAvailable(libnoscrypt)
 
