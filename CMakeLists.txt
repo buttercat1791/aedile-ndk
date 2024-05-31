@@ -57,7 +57,7 @@ include_directories(${uuid_v4_SOURCE_DIR})
 FetchContent_Declare(
     libnoscrypt
     GIT_REPOSITORY git@github.com:VnUgE/noscrypt.git
-    GIT_TAG 72e1b7be4031e2fd4d258fcf434ad049c0029201
+    GIT_TAG v0.1.2
 )
 FetchContent_MakeAvailable(libnoscrypt)
 
