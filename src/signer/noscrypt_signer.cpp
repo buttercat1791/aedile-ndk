@@ -32,7 +32,30 @@ NoscryptSigner::~NoscryptSigner()
 
 void NoscryptSigner::receiveConnection(string connectionToken)
 {
-    // Receive the connection token here.
+    if (connectionToken.empty())
+    {
+        PLOG_ERROR << "No connection token was provided - unable to connect to a remote signer.";
+        return;
+    }
+    
+    int queryStart = this->_parseRemotePublicKey(connectionToken);
+    if (queryStart == -1)
+    {
+        return;
+    }
+
+    string remainingToken = connectionToken.substr(queryStart);
+    int splitIndex = remainingToken.find('&');
+    do
+    {
+        string param = remainingToken.substr(0, splitIndex);
+        this->_handleConnectionTokenParam(param);
+
+        remainingToken = remainingToken.substr(splitIndex + 1);
+        splitIndex = remainingToken.find('&');
+    } while (splitIndex != string::npos);
+
+    // TODO: Handle any messaging with the remote signer.
 };
 
 string NoscryptSigner::initiateConnection(
@@ -73,6 +96,8 @@ string NoscryptSigner::initiateConnection(
     ss << "}";
 
     return ss.str();
+
+    // TODO: Handle any messaging with the remote signer.
 };
 
 void NoscryptSigner::sign(shared_ptr<data::Event> event)
@@ -174,6 +199,53 @@ tuple<string, string> NoscryptSigner::_createLocalKeypair()
     publicKey = pubkeyStream.str();
 
     return make_tuple(privateKey, publicKey);
+};
+
+int NoscryptSigner::_parseRemotePublicKey(string connectionToken)
+{
+    int queryStart = connectionToken.find('?');
+    if (queryStart == string::npos)
+    {
+        PLOG_ERROR << "The connection token is invalid - no query string was found.";
+        return -1;
+    }
+
+    const int pubkeyStart = 9;
+    string prefix = connectionToken.substr(0, pubkeyStart);
+    if (prefix != "bunker://")
+    {
+        PLOG_ERROR << "The connection token is invalid - the token must begin with 'bunker://'.";
+        return -1;
+    }
+
+    string remotePubkey = connectionToken.substr(pubkeyStart, queryStart);
+    this->_remotePublicKey = remotePubkey;
+
+    return queryStart + 1;
+};
+
+void NoscryptSigner::_handleConnectionTokenParam(string param)
+{
+    // Parse the query param into a key-value pair.
+    int splitIndex = param.find('=');
+    if (splitIndex == string::npos)
+    {
+        PLOG_ERROR << "The connection token query param is invalid - it is not of the form 'key=value'.";
+        return;
+    }
+
+    string key = param.substr(0, splitIndex);
+    string value = param.substr(splitIndex + 1);
+
+    // Handle the key-value pair.
+    if (key == "relay")
+    {
+        this->_relays.push_back(value);
+    }
+    else if (key == "secret")
+    {
+        this->_bunkerSecret = value;
+    }
 };
 
 #pragma region Logging
