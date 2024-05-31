@@ -122,13 +122,19 @@ tuple<string, string> nostr::signer::NoscryptSigner::_createLocalKeypair()
 
     random_device rd;
     mt19937 gen(rd());
-    uniform_int_distribution<> dist(0, NC_SEC_KEY_SIZE);
-    generate_n(secretKey.get()->key, NC_SEC_KEY_SIZE, [&]() { return dist(gen); });
+    uniform_int_distribution<> dist(0, sizeof(NCSecretKey));
 
-    // Check the validity of the secret key.
-    NCResult secretValidationResult = NCValidateSecretKey(this->_noscryptContext.get(), secretKey.get());
+    // Loop attempts to generate a secret key until a valid key is produced.
+    // Limit the number of attempts to prevent resource exhaustion in the event of a failure.
+    NCResult secretValidationResult;
+    int loopCount = 0;
+    do
+    {
+        generate_n(secretKey.get()->key, sizeof(NCSecretKey), [&]() { return dist(gen); });
+        secretValidationResult = NCValidateSecretKey(this->_noscryptContext.get(), secretKey.get());
+    } while (secretValidationResult != NC_SUCCESS && ++loopCount < 1024);
+
     this->_logNoscryptSecretValidationResult(secretValidationResult);
-
     if (secretValidationResult != NC_SUCCESS)
     {
         // Return empty strings if the secret key generation fails.
@@ -137,7 +143,7 @@ tuple<string, string> nostr::signer::NoscryptSigner::_createLocalKeypair()
 
     // Convert the buffer into a hex string for a more human-friendly representation.
     stringstream secretKeyStream;
-    for (int i = 0; i < NC_SEC_KEY_SIZE; i++)
+    for (int i = 0; i < sizeof(NCSecretKey); i++)
     {
         secretKeyStream << hex << setw(2) << setfill('0') << static_cast<int>(secretKey->key[i]);
     }
@@ -160,7 +166,7 @@ tuple<string, string> nostr::signer::NoscryptSigner::_createLocalKeypair()
     // Convert the now-populated pubkey buffer into a hex string for the pubkey representation
     // used by Nostr events.
     stringstream pubkeyStream;
-    for (int i = 0; i < NC_SEC_KEY_SIZE; i++)
+    for (int i = 0; i < sizeof(NCPublicKey); i++)
     {
         pubkeyStream << hex << setw(2) << setfill('0') << static_cast<int>(pubkey->key[i]);
     }
@@ -202,30 +208,13 @@ void nostr::signer::NoscryptSigner::_logNoscryptInitResult(NCResult initResult)
 
 void nostr::signer::NoscryptSigner::_logNoscryptSecretValidationResult(NCResult secretValidationResult)
 {
-    switch (secretValidationResult) {
-    case NC_SUCCESS:
-        PLOG_INFO << "noscrypt - success: Generated a valid secret key.";
-        break;
-    
-    case E_NULL_PTR:
-        PLOG_ERROR << "noscrypt - error: A null pointer was passed to the secret key validation function.";
-        break;
-
-    case E_INVALID_ARG:
-        PLOG_ERROR << "noscrypt - error: An invalid argument was passed to the secret key validation function.";
-        break;
-    
-    case E_INVALID_CONTEXT:
-        PLOG_ERROR << "noscrypt - error: The NCContext struct is in an invalid state.";
-        break;
-
-    case E_ARGUMENT_OUT_OF_RANGE:
-        PLOG_ERROR << "noscrypt - error: An argument was outside the range of acceptable values.";
-        break;
-
-    case E_OPERATION_FAILED:
-        PLOG_ERROR << "noscrypt - error: Failed to validate the generated secret key.";
-        break;
+    if (secretValidationResult == NC_SUCCESS)
+    {
+        PLOG_INFO << "noscrypt_signer - success: Generated a valid secret key.";
+    }
+    else
+    {
+        PLOG_ERROR << "noscrypt_signer - error: Failed to generate a valid secret key.";
     }
 };
 
