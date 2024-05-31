@@ -2,21 +2,22 @@
 
 #include "client/websocketpp_client.hpp"
 
+using namespace nostr::client;
 using namespace std;
 
-void nostr::client::WebsocketppClient::start()
+void WebsocketppClient::start()
 { 
     this->_client.init_asio();
     this->_client.start_perpetual();
 };
 
-void nostr::client::WebsocketppClient::stop()
+void WebsocketppClient::stop()
 {
     this->_client.stop_perpetual();
     this->_client.stop();
 };
 
-void nostr::client::WebsocketppClient::openConnection(string uri)
+void WebsocketppClient::openConnection(string uri)
 {
     error_code error;
     websocketpp_client::connection_ptr connection = this->_client.get_connection(uri, error);
@@ -41,13 +42,13 @@ void nostr::client::WebsocketppClient::openConnection(string uri)
     this->_client.connect(connection);
 };
 
-bool nostr::client::WebsocketppClient::isConnected(string uri)
+bool WebsocketppClient::isConnected(string uri)
 {
     lock_guard<mutex> lock(this->_propertyMutex);
     return this->_connectionHandles.find(uri) != this->_connectionHandles.end();
 };
 
-tuple<string, bool> nostr::client::WebsocketppClient::send(string message, string uri)
+tuple<string, bool> WebsocketppClient::send(string message, string uri)
 {
     error_code error;
 
@@ -67,7 +68,7 @@ tuple<string, bool> nostr::client::WebsocketppClient::send(string message, strin
     return make_tuple(uri, true);
 };
 
-tuple<string, bool> nostr::client::WebsocketppClient::send(
+tuple<string, bool> WebsocketppClient::send(
     string message,
     string uri,
     function<void(const string&)> messageHandler)
@@ -77,7 +78,7 @@ tuple<string, bool> nostr::client::WebsocketppClient::send(
     return successes;
 };
 
-void nostr::client::WebsocketppClient::receive(
+void WebsocketppClient::receive(
     string uri,
     function<void(const string&)> messageHandler)
 {
@@ -93,7 +94,7 @@ void nostr::client::WebsocketppClient::receive(
     });
 };
 
-void nostr::client::WebsocketppClient::closeConnection(string uri)
+void WebsocketppClient::closeConnection(string uri)
 {
     lock_guard<mutex> lock(this->_propertyMutex);
 

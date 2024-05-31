@@ -3,9 +3,10 @@
 #include "data/data.hpp"
 
 using namespace nlohmann;
+using namespace nostr::data;
 using namespace std;
 
-string nostr::data::Filters::serialize(string& subscriptionId)
+string Filters::serialize(string& subscriptionId)
 {
     try
     {
@@ -38,7 +39,7 @@ string nostr::data::Filters::serialize(string& subscriptionId)
     return jarr.dump();
 };
 
-void nostr::data::Filters::validate()
+void Filters::validate()
 {
     bool hasLimit = this->limit > 0;
     if (!hasLimit)

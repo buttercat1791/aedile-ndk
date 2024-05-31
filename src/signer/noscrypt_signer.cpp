@@ -5,9 +5,10 @@
 
 #include "signer/noscrypt_signer.hpp"
 
+using namespace nostr::signer;
 using namespace std;
 
-nostr::signer::NoscryptSigner::NoscryptSigner(
+NoscryptSigner::NoscryptSigner(
     shared_ptr<plog::IAppender> appender,
     shared_ptr<nostr::service::INostrServiceBase> nostrService)
 {
@@ -24,17 +25,17 @@ nostr::signer::NoscryptSigner::NoscryptSigner(
     this->_localPublicKey = publicKey;
 };
 
-nostr::signer::NoscryptSigner::~NoscryptSigner()
+NoscryptSigner::~NoscryptSigner()
 {
     NCDestroyContext(this->_noscryptContext.get());
 };
 
-void nostr::signer::NoscryptSigner::receiveConnection(string connectionToken)
+void NoscryptSigner::receiveConnection(string connectionToken)
 {
     // Receive the connection token here.
 };
 
-string nostr::signer::NoscryptSigner::initiateConnection(
+string NoscryptSigner::initiateConnection(
     vector<string> relays,
     string name,
     string url,
@@ -74,7 +75,7 @@ string nostr::signer::NoscryptSigner::initiateConnection(
     return ss.str();
 };
 
-void nostr::signer::NoscryptSigner::sign(shared_ptr<data::Event> event)
+void NoscryptSigner::sign(shared_ptr<data::Event> event)
 {
     // Sign the event here.
 };
@@ -83,7 +84,7 @@ void nostr::signer::NoscryptSigner::sign(shared_ptr<data::Event> event)
  * @brief Initializes the noscrypt library context into the class's `context` property.
  * @returns `true` if successful, `false` otherwise.
  */
-shared_ptr<NCContext> nostr::signer::NoscryptSigner::_initNoscryptContext()
+shared_ptr<NCContext> NoscryptSigner::_initNoscryptContext()
 {
     shared_ptr<NCContext> context;
     auto contextStructSize = NCGetContextStructSize();
@@ -112,7 +113,7 @@ shared_ptr<NCContext> nostr::signer::NoscryptSigner::_initNoscryptContext()
  * @remarks This keypair is intended for temporary use, and should not be saved or used outside
  * of this class.
  */
-tuple<string, string> nostr::signer::NoscryptSigner::_createLocalKeypair()
+tuple<string, string> NoscryptSigner::_createLocalKeypair()
 {
     string privateKey;
     string publicKey;
@@ -177,7 +178,7 @@ tuple<string, string> nostr::signer::NoscryptSigner::_createLocalKeypair()
 
 #pragma region Logging
 
-void nostr::signer::NoscryptSigner::_logNoscryptInitResult(NCResult initResult)
+void NoscryptSigner::_logNoscryptInitResult(NCResult initResult)
 {
     switch (initResult) {
     case NC_SUCCESS:
@@ -206,7 +207,7 @@ void nostr::signer::NoscryptSigner::_logNoscryptInitResult(NCResult initResult)
     }
 };
 
-void nostr::signer::NoscryptSigner::_logNoscryptSecretValidationResult(NCResult secretValidationResult)
+void NoscryptSigner::_logNoscryptSecretValidationResult(NCResult secretValidationResult)
 {
     if (secretValidationResult == NC_SUCCESS)
     {
@@ -218,7 +219,7 @@ void nostr::signer::NoscryptSigner::_logNoscryptSecretValidationResult(NCResult 
     }
 };
 
-void nostr::signer::NoscryptSigner::_logNoscryptPubkeyGenerationResult(NCResult pubkeyGenerationResult)
+void NoscryptSigner::_logNoscryptPubkeyGenerationResult(NCResult pubkeyGenerationResult)
 {
     switch (pubkeyGenerationResult) {
     case NC_SUCCESS:

@@ -8,14 +8,15 @@
 #include "service/nostr_service_base.hpp"
 
 using namespace nlohmann;
+using namespace nostr::service;
 using namespace std;
 
-nostr::service::NostrServiceBase::NostrServiceBase(
+NostrServiceBase::NostrServiceBase(
     shared_ptr<plog::IAppender> appender,
     shared_ptr<client::IWebSocketClient> client)
 : NostrServiceBase(appender, client, {}) { };
 
-nostr::service::NostrServiceBase::NostrServiceBase(
+NostrServiceBase::NostrServiceBase(
     shared_ptr<plog::IAppender> appender,
     shared_ptr<client::IWebSocketClient> client,
     vector<string> relays)
@@ -25,26 +26,26 @@ nostr::service::NostrServiceBase::NostrServiceBase(
     client->start();
 };
 
-nostr::service::NostrServiceBase::~NostrServiceBase()
+NostrServiceBase::~NostrServiceBase()
 {
     this->_client->stop();
 };
 
-vector<string> nostr::service::NostrServiceBase::defaultRelays() const
+vector<string> NostrServiceBase::defaultRelays() const
 { return this->_defaultRelays; };
 
-vector<string> nostr::service::NostrServiceBase::activeRelays() const
+vector<string> NostrServiceBase::activeRelays() const
 { return this->_activeRelays; };
 
-unordered_map<string, vector<string>> nostr::service::NostrServiceBase::subscriptions() const
+unordered_map<string, vector<string>> NostrServiceBase::subscriptions() const
 { return this->_subscriptions; };
 
-vector<string> nostr::service::NostrServiceBase::openRelayConnections()
+vector<string> NostrServiceBase::openRelayConnections()
 {
     return this->openRelayConnections(this->_defaultRelays);
 };
 
-vector<string> nostr::service::NostrServiceBase::openRelayConnections(vector<string> relays)
+vector<string> NostrServiceBase::openRelayConnections(vector<string> relays)
 {
     PLOG_INFO << "Attempting to connect to Nostr relays.";
     vector<string> unconnectedRelays = this->_getUnconnectedRelays(relays);
@@ -71,7 +72,7 @@ vector<string> nostr::service::NostrServiceBase::openRelayConnections(vector<str
     return this->_activeRelays;
 };
 
-void nostr::service::NostrServiceBase::closeRelayConnections()
+void NostrServiceBase::closeRelayConnections()
 {
     if (this->_activeRelays.size() == 0)
     {
@@ -82,7 +83,7 @@ void nostr::service::NostrServiceBase::closeRelayConnections()
     this->closeRelayConnections(this->_activeRelays);
 };
 
-void nostr::service::NostrServiceBase::closeRelayConnections(vector<string> relays)
+void NostrServiceBase::closeRelayConnections(vector<string> relays)
 {
     PLOG_INFO << "Disconnecting from Nostr relays.";
     vector<string> connectedRelays = this->_getConnectedRelays(relays);
@@ -107,7 +108,7 @@ void nostr::service::NostrServiceBase::closeRelayConnections(vector<string> rela
 };
 
 // TODO: Make this method return a promise.
-tuple<vector<string>, vector<string>> nostr::service::NostrServiceBase::publishEvent(
+tuple<vector<string>, vector<string>> NostrServiceBase::publishEvent(
     shared_ptr<nostr::data::Event> event)
 {
     vector<string> successfulRelays;
@@ -188,7 +189,7 @@ tuple<vector<string>, vector<string>> nostr::service::NostrServiceBase::publishE
 
 // TODO: Make this method return a promise.
 // TODO: Add a timeout to this method to prevent hanging while waiting for the relay.
-vector<shared_ptr<nostr::data::Event>> nostr::service::NostrServiceBase::queryRelays(
+vector<shared_ptr<nostr::data::Event>> NostrServiceBase::queryRelays(
     shared_ptr<nostr::data::Filters> filters)
 {
     if (filters->limit > 64 || filters->limit < 1)
@@ -283,7 +284,7 @@ vector<shared_ptr<nostr::data::Event>> nostr::service::NostrServiceBase::queryRe
     return events;
 };
 
-string nostr::service::NostrServiceBase::queryRelays(
+string NostrServiceBase::queryRelays(
     shared_ptr<nostr::data::Filters> filters,
     function<void(const string&, shared_ptr<nostr::data::Event>)> eventHandler,
     function<void(const string&)> eoseHandler,
@@ -335,7 +336,7 @@ string nostr::service::NostrServiceBase::queryRelays(
     return subscriptionId;
 };
 
-tuple<vector<string>, vector<string>> nostr::service::NostrServiceBase::closeSubscription(string subscriptionId)
+tuple<vector<string>, vector<string>> NostrServiceBase::closeSubscription(string subscriptionId)
 {
     vector<string> successfulRelays;
     vector<string> failedRelays;
@@ -395,7 +396,7 @@ tuple<vector<string>, vector<string>> nostr::service::NostrServiceBase::closeSub
     return make_tuple(successfulRelays, failedRelays);
 };
 
-bool nostr::service::NostrServiceBase::closeSubscription(string subscriptionId, string relay)
+bool NostrServiceBase::closeSubscription(string subscriptionId, string relay)
 {
     if (!this->_hasSubscription(subscriptionId, relay))
     {
@@ -435,7 +436,7 @@ bool nostr::service::NostrServiceBase::closeSubscription(string subscriptionId, 
     return success;
 };
 
-vector<string> nostr::service::NostrServiceBase::closeSubscriptions()
+vector<string> NostrServiceBase::closeSubscriptions()
 {
     unique_lock<mutex> lock(this->_propertyMutex);
     vector<string> subscriptionIds;
@@ -458,7 +459,7 @@ vector<string> nostr::service::NostrServiceBase::closeSubscriptions()
     return remainingSubscriptions;
 };
 
-vector<string> nostr::service::NostrServiceBase::_getConnectedRelays(vector<string> relays)
+vector<string> NostrServiceBase::_getConnectedRelays(vector<string> relays)
 {
     PLOG_VERBOSE << "Identifying connected relays.";
     vector<string> connectedRelays;
@@ -486,7 +487,7 @@ vector<string> nostr::service::NostrServiceBase::_getConnectedRelays(vector<stri
     return connectedRelays;
 };
 
-vector<string> nostr::service::NostrServiceBase::_getUnconnectedRelays(vector<string> relays)
+vector<string> NostrServiceBase::_getUnconnectedRelays(vector<string> relays)
 {
     PLOG_VERBOSE << "Identifying unconnected relays.";
     vector<string> unconnectedRelays;
@@ -517,7 +518,7 @@ vector<string> nostr::service::NostrServiceBase::_getUnconnectedRelays(vector<st
     return unconnectedRelays;
 };
 
-bool nostr::service::NostrServiceBase::_isConnected(string relay)
+bool NostrServiceBase::_isConnected(string relay)
 {
     auto it = find(this->_activeRelays.begin(), this->_activeRelays.end(), relay);
     if (it != this->_activeRelays.end()) // If the relay is in this->_activeRelays
@@ -527,7 +528,7 @@ bool nostr::service::NostrServiceBase::_isConnected(string relay)
     return false;
 };
 
-void nostr::service::NostrServiceBase::_eraseActiveRelay(string relay)
+void NostrServiceBase::_eraseActiveRelay(string relay)
 {
     auto it = find(this->_activeRelays.begin(), this->_activeRelays.end(), relay);
     if (it != this->_activeRelays.end()) // If the relay is in this->_activeRelays
@@ -536,7 +537,7 @@ void nostr::service::NostrServiceBase::_eraseActiveRelay(string relay)
     }
 };
 
-void nostr::service::NostrServiceBase::_connect(string relay)
+void NostrServiceBase::_connect(string relay)
 {
     PLOG_VERBOSE << "Connecting to relay " << relay;
     this->_client->openConnection(relay);
@@ -555,7 +556,7 @@ void nostr::service::NostrServiceBase::_connect(string relay)
     }
 };
 
-void nostr::service::NostrServiceBase::_disconnect(string relay)
+void NostrServiceBase::_disconnect(string relay)
 {
     this->_client->closeConnection(relay);
 
@@ -563,20 +564,20 @@ void nostr::service::NostrServiceBase::_disconnect(string relay)
     this->_eraseActiveRelay(relay);
 };
 
-string nostr::service::NostrServiceBase::_generateSubscriptionId()
+string NostrServiceBase::_generateSubscriptionId()
 {
     UUIDv4::UUIDGenerator<std::mt19937_64> uuidGenerator;
     UUIDv4::UUID uuid = uuidGenerator.getUUID();
     return uuid.str();
 };
 
-string nostr::service::NostrServiceBase::_generateCloseRequest(string subscriptionId)
+string NostrServiceBase::_generateCloseRequest(string subscriptionId)
 {
     json jarr = json::array({ "CLOSE", subscriptionId });
     return jarr.dump();
 };
 
-bool nostr::service::NostrServiceBase::_hasSubscription(string subscriptionId)
+bool NostrServiceBase::_hasSubscription(string subscriptionId)
 {
     lock_guard<mutex> lock(this->_propertyMutex);
     auto it = this->_subscriptions.find(subscriptionId);
@@ -584,7 +585,7 @@ bool nostr::service::NostrServiceBase::_hasSubscription(string subscriptionId)
     return it != this->_subscriptions.end();
 };
 
-bool nostr::service::NostrServiceBase::_hasSubscription(string subscriptionId, string relay)
+bool NostrServiceBase::_hasSubscription(string subscriptionId, string relay)
 {
     lock_guard<mutex> lock(this->_propertyMutex);
     auto subscriptionIt = this->_subscriptions.find(subscriptionId);
@@ -600,7 +601,7 @@ bool nostr::service::NostrServiceBase::_hasSubscription(string subscriptionId, s
     return relayIt != relays.end();
 };
 
-void nostr::service::NostrServiceBase::_onSubscriptionMessage(
+void NostrServiceBase::_onSubscriptionMessage(
     string message,
     function<void(const string&, shared_ptr<nostr::data::Event>)> eventHandler,
     function<void(const string&)> eoseHandler,
@@ -645,7 +646,7 @@ void nostr::service::NostrServiceBase::_onSubscriptionMessage(
     }
 };
 
-void nostr::service::NostrServiceBase::_onAcceptance(
+void NostrServiceBase::_onAcceptance(
     string message,
     function<void(const bool)> acceptanceHandler)
 {

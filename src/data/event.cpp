@@ -4,9 +4,10 @@
 #include "data/data.hpp"
 
 using namespace nlohmann;
+using namespace nostr::data;
 using namespace std;
 
-string nostr::data::Event::serialize()
+string Event::serialize()
 {
     try
     {
@@ -30,7 +31,7 @@ string nostr::data::Event::serialize()
     return j.dump();
 };
 
-nostr::data::Event nostr::data::Event::fromString(string jstr)
+Event Event::fromString(string jstr)
 {
     json j = json::parse(jstr);
     Event event;
@@ -47,7 +48,7 @@ nostr::data::Event nostr::data::Event::fromString(string jstr)
     return event;
 };
 
-nostr::data::Event nostr::data::Event::fromJson(json j)
+Event Event::fromJson(json j)
 {
     Event event;
 
@@ -68,7 +69,7 @@ nostr::data::Event nostr::data::Event::fromJson(json j)
     return event;
 };
 
-void nostr::data::Event::validate()
+void Event::validate()
 {
     bool hasPubkey = this->pubkey.length() > 0;
     if (!hasPubkey)
@@ -89,7 +90,7 @@ void nostr::data::Event::validate()
     }
 };
 
-string nostr::data::Event::generateId(string serializedData) const
+string Event::generateId(string serializedData) const
 {
     unsigned char hash[SHA256_DIGEST_LENGTH];
     EVP_Digest(serializedData.c_str(), serializedData.length(), hash, NULL, EVP_sha256(), NULL);
@@ -103,7 +104,7 @@ string nostr::data::Event::generateId(string serializedData) const
     return ss.str();
 };
 
-bool nostr::data::Event::operator==(const Event& other) const
+bool Event::operator==(const Event& other) const
 {
     if (this->id.empty())
     {
