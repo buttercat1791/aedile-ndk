@@ -18,7 +18,7 @@ class WebsocketppClient : public IWebSocketClient
 {
 public:
     void start() override
-    { 
+    {
         this->_client.init_asio();
         this->_client.start_perpetual();
     };
@@ -34,7 +34,7 @@ public:
         error_code error;
         websocketpp_client::connection_ptr connection = this->_client.get_connection(uri, error);
 
-        if (error.value() == -1)    
+        if (error.value() == -1)
         {
             // PLOG_ERROR << "Error connecting to relay " << relay << ": " << error.message();
         }
@@ -72,7 +72,7 @@ public:
             websocketpp::frame::opcode::text,
             error);
 
-        if (error.value() == -1)    
+        if (error.value() == -1)
         {
             return make_tuple(uri, false);
         }
@@ -110,7 +110,7 @@ public:
             handle,
             websocketpp::close::status::going_away,
             "_client requested close.");
-        
+
         this->_connectionHandles.erase(uri);
     };
 

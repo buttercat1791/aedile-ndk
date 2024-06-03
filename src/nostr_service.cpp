@@ -350,13 +350,13 @@ tuple<vector<string>, vector<string>> NostrService::closeSubscription(string sub
         PLOG_WARNING << "Subscription " << subscriptionId << " not found.";
         return make_tuple(successfulRelays, failedRelays);
     }
-    
+
     for (const string relay : subscriptionRelays)
     {
         future<tuple<string, bool>> closeFuture = async([this, subscriptionId, relay]()
         {
             bool success = this->closeSubscription(subscriptionId, relay);
-            
+
             return make_tuple(relay, success);
         });
         closeFutures.push_back(move(closeFuture));

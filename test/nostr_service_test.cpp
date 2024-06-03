@@ -29,7 +29,7 @@ public:
     MOCK_METHOD(void, closeConnection, (string uri), (override));
 };
 
-class FakeSigner : public nostr::ISigner 
+class FakeSigner : public nostr::ISigner
 {
 public:
     void sign(shared_ptr<nostr::Event> event) override
@@ -71,7 +71,7 @@ public:
         nostr::Event event1;
         event1.pubkey = "13tn5ccv2guflxgffq4aj0hw5x39pz70zcdrfd6vym887gry38zys28dask";
         event1.kind = 1;
-        event1.tags = 
+        event1.tags =
         {
             { "e", "5c83da77af1dec6d7289834998ad7aafbd9e2191396d75ec3cc27f5a77226f36", "wss://nostr.example.com" },
             { "p", "f7234bd4c1394dda46d09f35bd384dd30cc552ad5541990f98844fb06676e9ca" },
@@ -91,7 +91,7 @@ public:
         };
         event2.content = "Welcome to Nostr!";
         event2.createdAt = currentTime;
-        
+
         nostr::Event event3;
         event3.pubkey = "187ujhtmnv82ftg03h4heetwk3dd9mlfkf8th3fvmrk20nxk9mansuzuyla";
         event3.kind = 1;
@@ -124,7 +124,7 @@ public:
     }
 
     static const string getTestEventMessage(shared_ptr<nostr::Event> event, string subscriptionId)
-    {        
+    {
         auto signer = make_unique<FakeSigner>();
         signer->sign(event);
 
@@ -140,7 +140,7 @@ public:
     {
         nostr::Filters filters;
         filters.authors = {
-            "13tn5ccv2guflxgffq4aj0hw5x39pz70zcdrfd6vym887gry38zys28dask", 
+            "13tn5ccv2guflxgffq4aj0hw5x39pz70zcdrfd6vym887gry38zys28dask",
             "1l9d9jh67rkwayalrxcy686aujyz5pper5kzjv8jvg8pu9v9ns4ls0xvq42",
             "187ujhtmnv82ftg03h4heetwk3dd9mlfkf8th3fvmrk20nxk9mansuzuyla"
         };
@@ -154,7 +154,7 @@ public:
     {
         nostr::Filters filters;
         filters.authors = {
-            "13tn5ccv2guflxgffq4aj0hw5x39pz70zcdrfd6vym887gry38zys28dask", 
+            "13tn5ccv2guflxgffq4aj0hw5x39pz70zcdrfd6vym887gry38zys28dask",
             "1l9d9jh67rkwayalrxcy686aujyz5pper5kzjv8jvg8pu9v9ns4ls0xvq42",
             "187ujhtmnv82ftg03h4heetwk3dd9mlfkf8th3fvmrk20nxk9mansuzuyla"
         };
@@ -240,7 +240,7 @@ TEST_F(NostrServiceTest, OpenRelayConnections_OpensConnections_ToDefaultRelays)
             }
             return status;
         }));
-    
+
     auto nostrService = make_unique<nostr::NostrService>(
         testAppender,
         mockClient,
@@ -468,7 +468,7 @@ TEST_F(NostrServiceTest, PublishEvent_CorrectlyIndicates_AllSuccesses)
 
             return make_tuple(uri, true);
         }));
-    
+
     auto testEvent = make_shared<nostr::Event>(getTextNoteTestEvent());
     auto [successes, failures] = nostrService->publishEvent(testEvent);
 
@@ -514,7 +514,7 @@ TEST_F(NostrServiceTest, PublishEvent_CorrectlyIndicates_AllFailures)
         {
             return make_tuple(uri, false);
         }));
-    
+
     auto testEvent = make_shared<nostr::Event>(getTextNoteTestEvent());
     auto [successes, failures] = nostrService->publishEvent(testEvent);
 
@@ -573,7 +573,7 @@ TEST_F(NostrServiceTest, PublishEvent_CorrectlyIndicates_MixedSuccessesAndFailur
 
             return make_tuple(uri, true);
         }));
-    
+
     auto testEvent = make_shared<nostr::Event>(getTextNoteTestEvent());
     auto [successes, failures] = nostrService->publishEvent(testEvent);
 
@@ -623,7 +623,7 @@ TEST_F(NostrServiceTest, PublishEvent_CorrectlyIndicates_RejectedEvent)
 
             return make_tuple(uri, true);
         }));
-    
+
     auto testEvent = make_shared<nostr::Event>(getTextNoteTestEvent());
     auto [successes, failures] = nostrService->publishEvent(testEvent);
 
@@ -686,7 +686,7 @@ TEST_F(NostrServiceTest, PublishEvent_CorrectlyIndicates_EventRejectedBySomeRela
 
             return make_tuple(uri, true);
         }));
-    
+
     auto testEvent = make_shared<nostr::Event>(getTextNoteTestEvent());
     auto [successes, failures] = nostrService->publishEvent(testEvent);
 
@@ -890,7 +890,7 @@ TEST_F(NostrServiceTest, QueryRelays_CallsHandler_WithReturnedEvents)
             }
         },
         [](const string&, const string&) {});
-    
+
     eoseReceivedFuture.wait();
 
     // Check that the service is keeping track of its active subscriptions.
@@ -1055,7 +1055,7 @@ TEST_F(NostrServiceTest, Service_MaintainsMultipleSubscriptions_ThenClosesAll)
             longFormPromise.set_value();
         },
         [](const string&, const string&) {});
-    
+
     shortFormFuture.wait();
     longFormFuture.wait();
 

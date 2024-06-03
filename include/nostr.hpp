@@ -164,7 +164,7 @@ public:
      * @brief Closes any open connections to the specified Nostr relays.
      */
     void closeRelayConnections(std::vector<std::string> relays);
-    
+
     /**
      * @brief Publishes a Nostr event to all open relay connections.
      * @returns A tuple of `std::vector<std::string>` objects, of the form `<successes, failures>`, indicating
@@ -206,7 +206,7 @@ public:
         std::function<void(const std::string&, std::shared_ptr<Event>)> eventHandler,
         std::function<void(const std::string&)> eoseHandler,
         std::function<void(const std::string&, const std::string&)> closeHandler);
-    
+
     /**
      * @brief Closes the subscription with the given ID on all open relay connections.
      * @returns A tuple of `std::vector<std::string>` objects, of the form `<successes, failures>`, indicating
@@ -229,12 +229,6 @@ public:
      */
     std::vector<std::string> closeSubscriptions();
 
-    /**
-     * @brief Closes all open subscriptions on the given relays.
-     * @returns A list of any subscription IDs that failed to close.
-     */
-    std::vector<std::string> closeSubscriptions(std::vector<std::string> relays);
-
 private:
     ///< The maximum number of events the service will store for each subscription.
     const int MAX_EVENTS_PER_SUBSCRIPTION = 128;
@@ -249,7 +243,7 @@ private:
     ///< The default set of Nostr relays to which the service will attempt to connect.
     std::vector<std::string> _defaultRelays;
     ///< The set of Nostr relays to which the service is currently connected.
-    std::vector<std::string> _activeRelays; 
+    std::vector<std::string> _activeRelays;
     ///< A map from subscription IDs to the relays on which each subscription is open.
     std::unordered_map<std::string, std::vector<std::string>> _subscriptions;
 
@@ -327,7 +321,7 @@ private:
         std::function<void(const std::string&, std::shared_ptr<Event>)> eventHandler,
         std::function<void(const std::string&)> eoseHandler,
         std::function<void(const std::string&, const std::string&)> closeHandler);
-    
+
     /**
      * @brief Parses OK messages received from the relay and invokes the given acceptance handler.
      * @remark The OK message type is sent to indicate whether the relay has accepted an event sent
