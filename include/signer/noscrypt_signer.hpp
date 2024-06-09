@@ -2,11 +2,7 @@
 
 #include <plog/Init.h>
 #include <plog/Log.h>
-
-extern "C"
-{
 #include <noscrypt.h>
-}
 
 #include "service/nostr_service_base.hpp"
 #include "signer/signer.hpp"
@@ -32,10 +28,14 @@ public:
         std::string url,
         std::string description) override;
 
-    void sign(std::shared_ptr<data::Event> event) override;
+    std::shared_ptr<std::promise<bool>> sign(std::shared_ptr<data::Event> event) override;
 
 private:
     std::shared_ptr<NCContext> _noscryptContext;
+    std::shared_ptr<nostr::service::INostrServiceBase> _nostrService;
+
+    std::shared_ptr<NCPublicKey> _remotePubkey; // TODO: Set this when available.
+    std::shared_ptr<NCSecretKey> _localSecret;
 
     std::string _localPrivateKey;
     std::string _localPublicKey;
@@ -78,6 +78,31 @@ private:
      * class instance by side effect.
      */
     void _handleConnectionTokenParam(std::string param);
+
+    /**
+     * @brief Generates a unique ID for a signer request.
+     * @returns A GUID string.
+     */
+    std::string _generateSignerRequestId();
+
+    #pragma region Cryptography
+
+    /**
+     * @brief Reseeds OpenSSL's pseudo-random number generator, using `/dev/random` as the seed, if
+     * possible.
+    */
+    void _reseedRandomNumberGenerator(uint32_t bufferSize = 32);
+
+    std::string _encryptNip04();
+
+    /**
+     * @brief Encrypts a string according to the standard specified in NIP-44.
+     * @param input The string to be encrypted.
+     * @return The encrypted input.
+     */
+    std::string _encryptNip44(const std::string input); // TODO: Return or set HMAC?
+
+    #pragma endregion
 
     #pragma region Logging
 

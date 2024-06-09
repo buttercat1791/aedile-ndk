@@ -1,5 +1,6 @@
 #pragma once
 
+#include <future>
 #include <memory>
 #include <string>
 #include <vector>
@@ -21,9 +22,11 @@ public:
     /**
      * @brief Signs the given Nostr event.
      * @param event The event to sign.
+     * @returns A promise that will be fulfilled when the event has been signed.  It will be
+     * fulfilled with `true` if the signing succeeded, and `false` if it failed.
      * @remark The event's `sig` field will be updated in-place with the signature.
      */
-    virtual void sign(std::shared_ptr<nostr::data::Event> event) = 0;
+    virtual std::shared_ptr<std::promise<bool>> sign(std::shared_ptr<nostr::data::Event> event) = 0;
 };
 
 class INostrConnectSigner : public ISigner

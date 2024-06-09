@@ -19,12 +19,13 @@ string Event::serialize()
     }
 
     json j = {
-        {"pubkey", this->pubkey},
-        {"created_at", this->createdAt},
-        {"kind", this->kind},
-        {"tags", this->tags},
-        {"content", this->content},
-        {"sig", this->sig}};
+        { "pubkey", this->pubkey },
+        { "created_at", this->createdAt },
+        { "kind", this->kind },
+        { "tags", this->tags },
+        { "content", this->content },
+        { "sig", this->sig }
+    };
 
     j["id"] = this->generateId(j.dump());
 

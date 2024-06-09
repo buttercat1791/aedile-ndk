@@ -1,18 +1,28 @@
 #include <algorithm>
+#include <chrono>
 #include <random>
 #include <sstream>
 #include <tuple>
 
+#include <nlohmann/json.hpp>
+#include <openssl/err.h>
+#include <openssl/rand.h>
+#include <uuid_v4.h>
+
 #include "signer/noscrypt_signer.hpp"
 
+using namespace nostr::data;
+using namespace nostr::service;
 using namespace nostr::signer;
 using namespace std;
 
 NoscryptSigner::NoscryptSigner(
     shared_ptr<plog::IAppender> appender,
-    shared_ptr<nostr::service::INostrServiceBase> nostrService)
+    shared_ptr<INostrServiceBase> nostrService)
 {
     plog::init(plog::debug, appender.get());
+
+    this->_reseedRandomNumberGenerator();
 
     this->_noscryptContext = this->_initNoscryptContext();
     if (this->_noscryptContext == nullptr)
@@ -23,6 +33,8 @@ NoscryptSigner::NoscryptSigner(
     const auto [privateKey, publicKey] = this->_createLocalKeypair();
     this->_localPrivateKey = privateKey;
     this->_localPublicKey = publicKey;
+
+    this->_nostrService = nostrService;
 };
 
 NoscryptSigner::~NoscryptSigner()
@@ -100,9 +112,63 @@ string NoscryptSigner::initiateConnection(
     // TODO: Handle any messaging with the remote signer.
 };
 
-void NoscryptSigner::sign(shared_ptr<data::Event> event)
+shared_ptr<promise<bool>> NoscryptSigner::sign(shared_ptr<Event> event)
 {
-    // Sign the event here.
+    const int nostrConnectKind = 24133; // Kind 24133 is reserved for NIP-46 events.
+
+    auto signingPromise = make_shared<promise<bool>>();
+
+    // Create the JSON-RPC-like message content.
+    auto params = nlohmann::json::array();
+    params.push_back(event->serialize());
+
+    auto requestId = this->_generateSignerRequestId();
+
+    nlohmann::json jrpc = {
+        { "id", requestId },
+        { "method", "sign_event" },
+        { "params", params }
+    };
+
+    // TODO: Encrypt the message content with NIP-04 (or NIP-44).
+    NCEncryptionArgs encryptionArgs;
+
+    string encryptedContent;
+
+    // Wrap the event to be signed in a signing request event.
+    auto signingRequest = make_shared<Event>();
+    signingRequest->pubkey = this->_localPublicKey;
+    signingRequest->kind = nostrConnectKind;
+    signingRequest->tags.push_back({ "p", this->_remotePublicKey });
+    signingRequest->content = encryptedContent;
+    // TODO: Sign the wrapper event with the local private key.
+
+    // Create a filter set to find events from the remote signer.
+    auto remoteSignerFilters = make_shared<Filters>();
+    remoteSignerFilters->kinds.push_back(nostrConnectKind);
+    remoteSignerFilters->since = time(nullptr); // Filter for new signer events.
+    remoteSignerFilters->tags["p"] = { this->_localPublicKey }; // Signer events tag the local npub.
+    remoteSignerFilters->limit = 1; // We only need the immediate response to the signing request.
+
+    // TODO: Ping the remote signer before sending the request.
+
+    // Send the signing request.
+    this->_nostrService->publishEvent(signingRequest);
+
+    // Wait for the remote signer's response.
+    this->_nostrService->queryRelays(
+        remoteSignerFilters,
+        [this, &signingPromise](const string&, shared_ptr<Event> event)
+        {
+            // TODO: Handle the response from the remote signer.
+            
+            // Eventually:
+            signingPromise->set_value(true);
+        },
+        nullptr,
+        nullptr);
+    
+    return signingPromise;
 };
 
 /**
@@ -146,19 +212,22 @@ tuple<string, string> NoscryptSigner::_createLocalKeypair()
     // To generate a private key, all we need is a random 32-bit buffer.
     unique_ptr<NCSecretKey> secretKey(new NCSecretKey);
 
-    random_device rd;
-    mt19937 gen(rd());
-    uniform_int_distribution<> dist(0, sizeof(NCSecretKey));
-
     // Loop attempts to generate a secret key until a valid key is produced.
     // Limit the number of attempts to prevent resource exhaustion in the event of a failure.
     NCResult secretValidationResult;
     int loopCount = 0;
     do
     {
-        generate_n(secretKey.get()->key, sizeof(NCSecretKey), [&]() { return dist(gen); });
+        int rc = RAND_bytes(secretKey->key, sizeof(NCSecretKey));
+        if (rc != 1)
+        {
+            unsigned long err = ERR_get_error();
+            PLOG_ERROR << "OpenSSL error " << err << " occurred while generating a secret key.";
+            return make_tuple(string(), string());
+        }
+
         secretValidationResult = NCValidateSecretKey(this->_noscryptContext.get(), secretKey.get());
-    } while (secretValidationResult != NC_SUCCESS && ++loopCount < 1024);
+    } while (secretValidationResult != NC_SUCCESS && ++loopCount < 64);
 
     this->_logNoscryptSecretValidationResult(secretValidationResult);
     if (secretValidationResult != NC_SUCCESS)
@@ -166,6 +235,8 @@ tuple<string, string> NoscryptSigner::_createLocalKeypair()
         // Return empty strings if the secret key generation fails.
         return make_tuple(string(), string());
     }
+
+    this->_localSecret = move(secretKey);
 
     // Convert the buffer into a hex string for a more human-friendly representation.
     stringstream secretKeyStream;
@@ -247,6 +318,77 @@ void NoscryptSigner::_handleConnectionTokenParam(string param)
         this->_bunkerSecret = value;
     }
 };
+
+string NoscryptSigner::_generateSignerRequestId()
+{
+    UUIDv4::UUIDGenerator<std::mt19937_64> uuidGenerator;
+    UUIDv4::UUID uuid = uuidGenerator.getUUID();
+    return uuid.str();
+};
+
+#pragma region Cryptography
+
+void NoscryptSigner::_reseedRandomNumberGenerator(uint32_t bufferSize)
+{
+    int rc = RAND_load_file("/dev/random", bufferSize);
+    if (rc != bufferSize)
+    {
+        PLOG_WARNING << "Failed to reseed the RNG with /dev/random, falling back to /dev/urandom.";
+        RAND_poll();
+    }
+};
+
+string NoscryptSigner::_encryptNip04()
+{
+    throw runtime_error("NIP-04 encryption is not yet implemented.");
+};
+
+string NoscryptSigner::_encryptNip44(const string input)
+{
+    uint32_t nip44Version = 0x02;
+
+    shared_ptr<uint8_t> nonce(new uint8_t[32]);
+    shared_ptr<uint8_t> hmacKey(new uint8_t[32]);
+
+    uint32_t bufferSize = input.length();
+    shared_ptr<uint8_t> output(new uint8_t[bufferSize]);
+
+    // Generate a nonce to use for the encryption.
+    int code = RAND_bytes(nonce.get(), 32);
+    if (code <= 0)
+    {
+        PLOG_ERROR << "Failed to generate a nonce for NIP-44 encryption.";
+        return string();
+    }
+
+    // Setup the encryption context.
+    NCEncryptionArgs encryptionArgs =
+    {
+        nonce.get(),
+        hmacKey.get(),
+        (uint8_t*)input.c_str(),
+        output.get(),
+        bufferSize,
+        nip44Version
+    };
+
+    // Perform the encryption.
+    NCResult encryptionResult = NCEncrypt(
+        this->_noscryptContext.get(),
+        this->_localSecret.get(),
+        this->_remotePubkey.get(),
+        &encryptionArgs);
+    
+    // TODO: Handle various codes.
+    if (encryptionResult != NC_SUCCESS)
+    {
+        return string();
+    }
+
+    return string((char*)output.get(), bufferSize);
+};
+
+#pragma endregion
 
 #pragma region Logging
 

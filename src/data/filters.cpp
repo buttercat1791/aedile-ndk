@@ -18,12 +18,13 @@ string Filters::serialize(string& subscriptionId)
     }
 
     json j = {
-        {"ids", this->ids},
-        {"authors", this->authors},
-        {"kinds", this->kinds},
-        {"since", this->since},
-        {"until", this->until},
-        {"limit", this->limit}};
+        { "ids", this->ids },
+        { "authors", this->authors },
+        { "kinds", this->kinds },
+        { "since", this->since },
+        { "until", this->until },
+        { "limit", this->limit }
+    };
 
     for (auto& tag : this->tags)
     {
