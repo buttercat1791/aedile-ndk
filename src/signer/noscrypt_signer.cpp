@@ -116,8 +116,8 @@ shared_ptr<promise<bool>> NoscryptSigner::sign(shared_ptr<Event> event)
 {
     auto signingPromise = make_shared<promise<bool>>();
 
-    bool signerAvailable = this->_pingSigner();
-    if (!signerAvailable)
+    auto signerAvailable = this->_pingSigner().get_future();
+    if (signerAvailable.get() == false)
     {
         PLOG_ERROR << "Ping to the remote signer failed - the remote signer may be unavailable.";
         signingPromise->set_value(false);
@@ -408,20 +408,47 @@ string NoscryptSigner::_unwrapSignerMessage(shared_ptr<Event> event)
     return decryptedContent;
 };
 
-bool NoscryptSigner::_pingSigner()
+promise<bool> NoscryptSigner::_pingSigner()
 {
+    promise<bool> pingPromise;
+
+    // Generate a ping message and wrap it for the signer.
     nlohmann::json jrpc =
     {
         { "id", this->_generateSignerRequestId() },
         { "method", "ping" },
         { "params", nlohmann::json::array() }
     };
-
     auto messageEvent = this->_wrapSignerMessage(jrpc);
+
+    // Generate a filter to receive the response.
+    auto pingFilter = make_shared<Filters>();
+    pingFilter->authors.push_back(this->_remotePublicKey);
+    pingFilter->kinds.push_back(this->_nostrConnectKind);
+    pingFilter->tags["p"] = { this->_localPublicKey };
+    pingFilter->since = time(nullptr);
 
     this->_nostrService->publishEvent(messageEvent);
 
     // TODO: Handle the relay response.
+    this->_nostrService->queryRelays(
+        pingFilter,
+        [this, &pingPromise](const string&, shared_ptr<Event> pongEvent)
+        {
+            // 
+            string pongMessage = this->_unwrapSignerMessage(pongEvent);
+            pingPromise.set_value(pongMessage == "pong");
+        },
+        [&pingPromise](const string&)
+        {
+            pingPromise.set_value(false);
+        },
+        [&pingPromise](const string&, const string&)
+        {
+            pingPromise.set_value(false);
+        });
+    
+    return pingPromise;
 };
 
 #pragma region Cryptography

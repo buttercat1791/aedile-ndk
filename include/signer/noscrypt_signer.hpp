@@ -90,10 +90,10 @@ private:
     std::string _generateSignerRequestId();
 
     /**
-     * @brief Builds a wrapper event for JRPC-like signer messages.
+     * @brief Builds and signs a wrapper event for JRPC-like signer messages.
      * @param jrpc The JRPC-like payload that will comprise the event content, as specified by
      * NIP-46.
-     * @returns A shared pointer to the wrapper event.
+     * @returns A shared pointer to the signed wrapper event.
      */
     std::shared_ptr<nostr::data::Event> _wrapSignerMessage(nlohmann::json jrpc);
 
@@ -108,9 +108,9 @@ private:
 
     /**
      * @brief Pings the remote signer to confirm that it is online and available.
-     * @returns `true` if the signer is available, `false` otherwise.
+     * @returns A promise that will be set to `true` if the signer is available, `false` otherwise.
      */
-    bool _pingSigner();
+    std::promise<bool> _pingSigner();
 
     #pragma region Cryptography
 
