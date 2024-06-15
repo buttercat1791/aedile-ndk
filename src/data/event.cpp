@@ -7,6 +7,7 @@ using namespace nlohmann;
 using namespace nostr::data;
 using namespace std;
 
+// TODO: Verify event signature using noscrypt.
 string Event::serialize()
 {
     try

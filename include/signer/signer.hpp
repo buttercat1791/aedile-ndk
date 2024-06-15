@@ -11,6 +11,12 @@ namespace nostr
 {
 namespace signer
 {
+enum class Encryption
+{
+    NIP04,
+    NIP44
+};
+
 /**
  * @brief An interface for Nostr event signing that implements NIP-46.
  */

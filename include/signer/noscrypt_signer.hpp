@@ -31,6 +31,10 @@ public:
     std::shared_ptr<std::promise<bool>> sign(std::shared_ptr<data::Event> event) override;
 
 private:
+    const int _nostrConnectKind = 24133; // Kind 24133 is reserved for NIP-46 events.
+
+    Encryption _nostrConnectEncryption;
+
     std::shared_ptr<NCContext> _noscryptContext;
     std::shared_ptr<nostr::service::INostrServiceBase> _nostrService;
 
@@ -85,6 +89,29 @@ private:
      */
     std::string _generateSignerRequestId();
 
+    /**
+     * @brief Builds a wrapper event for JRPC-like signer messages.
+     * @param jrpc The JRPC-like payload that will comprise the event content, as specified by
+     * NIP-46.
+     * @returns A shared pointer to the wrapper event.
+     */
+    std::shared_ptr<nostr::data::Event> _wrapSignerMessage(nlohmann::json jrpc);
+
+    /**
+     * @brief Unwraps the JRPC-like payload from a signer message, typically one received from the
+     * remote signer in response to a request.
+     * @param event An event containing a NIP-46 message payload.
+     * @returns The unwrapped payload.  The returned object will be empty if no valid payload could
+     * be extracted from the given event.
+     */
+    std::string _unwrapSignerMessage(std::shared_ptr<nostr::data::Event> event);
+
+    /**
+     * @brief Pings the remote signer to confirm that it is online and available.
+     * @returns `true` if the signer is available, `false` otherwise.
+     */
+    bool _pingSigner();
+
     #pragma region Cryptography
 
     /**
@@ -93,14 +120,35 @@ private:
     */
     void _reseedRandomNumberGenerator(uint32_t bufferSize = 32);
 
-    std::string _encryptNip04();
+    /**
+     * @brief Encrypts a string according to the standard specified in NIP-04.
+     * @param input The string to be encrypted.
+     * @return The resulting encrypted string, or an empty string if the input could not be
+     * encrypted.
+     */
+    std::string _encryptNip04(const std::string input);
+
+    /**
+     * @brief Decrypts a NIP-04 encrypted string.
+     * @param input The string to be decrypted.
+     * @return The decrypted string, or an empty string if the input could not be decrypted.
+     */
+    std::string _decryptNip04(const std::string input);
 
     /**
      * @brief Encrypts a string according to the standard specified in NIP-44.
      * @param input The string to be encrypted.
-     * @return The encrypted input.
+     * @return The resulting encrypted string, or an empty string if the input could not be
+     * encrypted.
      */
     std::string _encryptNip44(const std::string input); // TODO: Return or set HMAC?
+
+    /**
+     * @brief Decrypts a NIP-44 encrypted string.
+     * @param input The string to be decrypted.
+     * @return The decrypted string, or an empty string if the input could not be decrypted.
+     */
+    std::string _decryptNip44(const std::string input);
 
     #pragma endregion
 
