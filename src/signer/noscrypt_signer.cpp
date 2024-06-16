@@ -1,5 +1,6 @@
 #include <algorithm>
 #include <chrono>
+#include <memory>
 #include <random>
 #include <sstream>
 #include <tuple>
@@ -487,7 +488,7 @@ string NoscryptSigner::_encryptNip44(const string input)
     }
 
     // Setup the encryption context.
-    unique_ptr<NCEncryptionArgs> encryptionArgs(new NCEncryptionArgs
+    auto encryptionArgs = make_unique<NCEncryptionArgs>(NCEncryptionArgs
     {
         nonce.get(),
         hmacKey.get(),
@@ -532,7 +533,7 @@ string NoscryptSigner::_decryptNip44(const string input)
     }
 
     // Set up the decryption context.
-    unique_ptr<NCEncryptionArgs> decryptionArgs(new NCEncryptionArgs
+    auto decryptionArgs = make_unique<NCEncryptionArgs>(NCEncryptionArgs
     {
         nonce.get(),
         hmacKey.get(),
