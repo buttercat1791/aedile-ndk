@@ -184,10 +184,17 @@ inline string NoscryptSigner::_getLocalPrivateKey() const
 
 inline void NoscryptSigner::_setLocalPrivateKey(const string value)
 {
-    auto seckeyBuf = reinterpret_cast<uint8_t*>(const_cast<char*>(value.data()));
     auto seckey = make_unique<NCSecretKey>();
-    memcpy(seckey->key, seckeyBuf, sizeof(NCSecretKey));
-    
+
+    for (auto i = 0; i < sizeof(NCSecretKey); i++)
+    {
+        stringstream ss;
+        ss << hex << value.substr(i * 2, 2);
+        uint8_t byte;
+        ss >> byte;
+        seckey->key[i] = byte;
+    }
+
     this->_localPrivateKey = move(seckey);
 };
 
@@ -204,10 +211,17 @@ inline string NoscryptSigner::_getLocalPublicKey() const
 
 inline void NoscryptSigner::_setLocalPublicKey(const string value)
 {
-    auto pubkeyBuf = reinterpret_cast<uint8_t*>(const_cast<char*>(value.data()));
     auto pubkey = make_unique<NCPublicKey>();
-    memcpy(pubkey->key, pubkeyBuf, sizeof(NCPublicKey));
-    
+
+    for (auto i = 0; i < sizeof(NCPublicKey); i++)
+    {
+        stringstream ss;
+        ss << hex << value.substr(i * 2, 2);
+        uint8_t byte;
+        ss >> byte;
+        pubkey->key[i] = byte;
+    }
+
     this->_localPublicKey = move(pubkey);
 };
 
@@ -224,10 +238,17 @@ inline string NoscryptSigner::_getRemotePublicKey() const
 
 inline void NoscryptSigner::_setRemotePublicKey(const string value)
 {
-    auto pubkeyBuf = reinterpret_cast<uint8_t*>(const_cast<char*>(value.data()));
     auto pubkey = make_unique<NCPublicKey>();
-    memcpy(pubkey->key, pubkeyBuf, sizeof(NCPublicKey));
-    
+
+    for (auto i = 0; i < sizeof(NCPublicKey); i++)
+    {
+        stringstream ss;
+        ss << hex << value.substr(i * 2, 2);
+        uint8_t byte;
+        ss >> byte;
+        pubkey->key[i] = byte;
+    }
+
     this->_remotePublicKey = move(pubkey);
 };
 
