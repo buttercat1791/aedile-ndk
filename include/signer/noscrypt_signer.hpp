@@ -31,39 +31,58 @@ public:
     std::shared_ptr<std::promise<bool>> sign(std::shared_ptr<data::Event> event) override;
 
 private:
-    const int _nostrConnectKind = 24133; // Kind 24133 is reserved for NIP-46 events.
+    static constexpr int _nostrConnectKind = 24133; // Kind 24133 is reserved for NIP-46 events.
 
     Encryption _nostrConnectEncryption;
 
     std::shared_ptr<NCContext> _noscryptContext;
     std::shared_ptr<nostr::service::INostrServiceBase> _nostrService;
 
-    std::shared_ptr<NCPublicKey> _remotePubkey; // TODO: Set this when available.
-    std::shared_ptr<NCSecretKey> _localSecret;
+    ///< Local nsec for communicating with the remote signer.
+    std::shared_ptr<NCSecretKey> _localPrivateKey;
 
-    std::string _localPrivateKey;
-    std::string _localPublicKey;
+    ///< Local npub for communicating with the remote signer.
+    std::shared_ptr<NCPublicKey> _localPublicKey;
 
-    std::string _remotePublicKey;
+    ///< The npub on whose behalf the remote signer is acting.
+    std::shared_ptr<NCPublicKey> _remotePublicKey;
+
+    ///< An optional secret value provided by the remote signer.
     std::string _bunkerSecret;
 
     ///< A list of relays that will be used to connect to the remote signer.
     std::vector<std::string> _relays;
+
+    #pragma region Private Accessors
+
+    inline std::string _getLocalPrivateKey() const;
+
+    inline void _setLocalPrivateKey(const std::string value);
+
+    inline std::string _getLocalPublicKey() const;
+
+    inline void _setLocalPublicKey(const std::string value);
+
+    inline std::string _getRemotePublicKey() const;
+
+    inline void _setRemotePublicKey(const std::string value);
+
+    #pragma endregion
+
+    #pragma region Setup
     
     /**
      * @brief Initializes the noscrypt library context into the class's `context` property.
-     * @returns `true` if successful, `false` otherwise.
      */
-    std::shared_ptr<NCContext> _initNoscryptContext();
+    void _initNoscryptContext();
 
     /**
-     * @brief Generates a private/public key pair for local use.
-     * @returns The generated keypair of the form `[privateKey, publicKey]`, or a pair of empty
-     * strings if the function failed.
+     * @brief Generates a private/public key pair for local use and sets it to the class's private
+     * properties.
      * @remarks This keypair is intended for temporary use, and should not be saved or used outside
      * of this class.
      */
-    std::tuple<std::string, std::string> _createLocalKeypair();
+    void _createLocalKeypair();
 
     /**
      * @brief Parses the remote signer npub from a connection token provided by the signer.
@@ -83,11 +102,15 @@ private:
      */
     void _handleConnectionTokenParam(std::string param);
 
+    #pragma endregion
+
+    #pragma region Signer Helpers
+
     /**
      * @brief Generates a unique ID for a signer request.
      * @returns A GUID string.
      */
-    std::string _generateSignerRequestId();
+    inline std::string _generateSignerRequestId() const;
 
     /**
      * @brief Builds and signs a wrapper event for JRPC-like signer messages.
@@ -107,10 +130,18 @@ private:
     std::string _unwrapSignerMessage(std::shared_ptr<nostr::data::Event> event);
 
     /**
+     * @brief Constructs a filter set that queries for messages sent from the signer to the client.
+     * @returns A shared pointer to the constructed filter set.
+     */
+    inline std::shared_ptr<nostr::data::Filters> _buildSignerMessageFilters() const;
+
+    /**
      * @brief Pings the remote signer to confirm that it is online and available.
      * @returns A promise that will be set to `true` if the signer is available, `false` otherwise.
      */
     std::promise<bool> _pingSigner();
+
+    #pragma endregion
 
     #pragma region Cryptography
 
@@ -126,14 +157,14 @@ private:
      * @return The resulting encrypted string, or an empty string if the input could not be
      * encrypted.
      */
-    std::string _encryptNip04(const std::string input);
+    std::string _encryptNip04(std::string input);
 
     /**
      * @brief Decrypts a NIP-04 encrypted string.
      * @param input The string to be decrypted.
      * @return The decrypted string, or an empty string if the input could not be decrypted.
      */
-    std::string _decryptNip04(const std::string input);
+    std::string _decryptNip04(std::string input);
 
     /**
      * @brief Encrypts a string according to the standard specified in NIP-44.
@@ -154,11 +185,11 @@ private:
 
     #pragma region Logging
 
-    void _logNoscryptInitResult(NCResult initResult);
+    inline void _logNoscryptInitResult(NCResult initResult) const;
 
-    void _logNoscryptSecretValidationResult(NCResult secretValidationResult);
+    inline void _logNoscryptSecretValidationResult(NCResult secretValidationResult) const;
 
-    void _logNoscryptPubkeyGenerationResult(NCResult pubkeyGenerationResult);
+    inline void _logNoscryptPubkeyGenerationResult(NCResult pubkeyGenerationResult) const;
 
     #pragma endregion
 };
