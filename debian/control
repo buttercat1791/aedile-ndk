@@ -1,0 +1,6 @@
+Package: libaedile
+Version: 0.0.2
+Maintainer: MichaelJ
+Architecture: amd64
+Description: Plug-and-play Nostr Development Kit
+Pre-Depends: dpkg ( >= 1.16.1), libwebsocketpp-dev ( >= 0.8.1-7), nlohmann-json3-dev ( >= 3.7.3-1), libssl-dev ( >= 3.0.11-1~deb12u2_amd64.deb)
