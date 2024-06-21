@@ -49,3 +49,8 @@ cmake_install.cmake
 
 # vcpkg
 vcpkg_installed/
+
+# debian packaging
+*.deb
+deb/opt
+deb/usr
