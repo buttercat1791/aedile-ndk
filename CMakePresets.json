@@ -7,7 +7,7 @@
         "binaryDir": "${sourceDir}/build/linux",
         "cacheVariables": {
           "CMAKE_TOOLCHAIN_FILE": "$env{VCPKG_ROOT}/scripts/buildsystems/vcpkg.cmake",
-          "CMAKE_INSTALL_PREFIX": "$env{PACK_DIR}"
+          "CMAKE_INSTALL_PREFIX": "$env{INSTALL_DIR}"
         }
       }
     ],
