@@ -1,5 +1,6 @@
 #include "nostr.hpp"
 #include "client/web_socket_client.hpp"
+#include <unordered_set>
 
 using namespace nlohmann;
 using namespace std;
@@ -213,8 +214,10 @@ vector<shared_ptr<Event>> NostrService::queryRelays(shared_ptr<Filters> filters)
 
     vector<future<tuple<string, bool>>> requestFutures;
 
+    unordered_set<string> uniqueEventIds;
+
     // Send the same query to each relay.  As events trickle in from each relay, they will be added
-    // to the events vector.  Multiple copies of an event may be received if the same event is
+    // to the events vector.  Duplicate copies of the same event will be ignored, as events are
     // stored on multiple relays.  The function will block until all of the relays send an EOSE or
     // CLOSE message.
     for (const string relay : this->_activeRelays)
@@ -225,13 +228,17 @@ vector<shared_ptr<Event>> NostrService::queryRelays(shared_ptr<Filters> filters)
         auto [uri, success] = this->_client->send(
             request,
             relay,
-            [this, &relay, &events, &eosePromise](string payload)
+            [this, &relay, &events, &eosePromise, &uniqueEventIds](string payload)
             {
                 this->onSubscriptionMessage(
                     payload,
-                    [&events](const string&, shared_ptr<Event> event)
+                    [&events, &uniqueEventIds](const string&, shared_ptr<Event> event)
                     {
-                        events.push_back(event);
+                        // Check if the event is unique before adding.
+                        if (uniqueEventIds.insert(event->id).second)
+                        {
+                            events.push_back(event);
+                        }
                     },
                     [relay, &eosePromise](const string&)
                     {
@@ -271,8 +278,6 @@ vector<shared_ptr<Event>> NostrService::queryRelays(shared_ptr<Filters> filters)
         }
     }
     this->closeSubscription(subscriptionId);
-
-    // TODO: De-duplicate events in the vector before returning.
 
     return events;
 };
