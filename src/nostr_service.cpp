@@ -184,7 +184,7 @@ tuple<vector<string>, vector<string>> NostrService::publishEvent(shared_ptr<Even
 
 // TODO: Make this method return a promise.
 // TODO: Add a timeout to this method to prevent hanging while waiting for the relay.
-vector<shared_ptr<Event>> NostrService::queryRelays(shared_ptr<Filters> filters)
+std::future<vector<shared_ptr<Event>> NostrService::queryRelays(shared_ptr<Filters> filters)
 {
     if (filters->limit > 64 || filters->limit < 1)
     {
