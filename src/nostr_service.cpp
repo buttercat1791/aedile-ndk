@@ -182,104 +182,108 @@ tuple<vector<string>, vector<string>> NostrService::publishEvent(shared_ptr<Even
     return make_tuple(successfulRelays, failedRelays);
 };
 
-// TODO: Make this method return a promise.
 // TODO: Add a timeout to this method to prevent hanging while waiting for the relay.
-std::future<vector<shared_ptr<Event>> NostrService::queryRelays(shared_ptr<Filters> filters)
+std::future<vector<shared_ptr<Event>>> NostrService::queryRelays(shared_ptr<Filters> filters)
 {
-    if (filters->limit > 64 || filters->limit < 1)
+    return std::async(std::launch::async, [this, filters]() -> vector<shared_ptr<Event>>
     {
-        PLOG_WARNING << "Filters limit must be between 1 and 64, inclusive.  Setting limit to 16.";
-        filters->limit = 16;
-    }
+        if (filters->limit > 64 || filters->limit < 1)
+        {
+            PLOG_WARNING << "Filters limit must be between 1 and 64, inclusive.  Setting limit to 16.";
+            filters->limit = 16;
+        }
 
-    vector<shared_ptr<Event>> events;
+        vector<shared_ptr<Event>> events;
 
-    string subscriptionId = this->generateSubscriptionId();
-    string request;
+        string subscriptionId = this->generateSubscriptionId();
+        string request;
 
-    try
-    {
-        request = filters->serialize(subscriptionId);
-    }
-    catch (const invalid_argument& e)
-    {
-        PLOG_ERROR << "Failed to serialize filters - invalid object: " << e.what();
-        throw e;
-    }
-    catch (const json::exception& je)
-    {
-        PLOG_ERROR << "Failed to serialize filters - JSON exception: " << je.what();
-        throw je;
-    }
+        try
+        {
+            request = filters->serialize(subscriptionId);
+        }
+        catch (const invalid_argument& e)
+        {
+            PLOG_ERROR << "Failed to serialize filters - invalid object: " << e.what();
+            throw e;
+        }
+        catch (const json::exception& je)
+        {
+            PLOG_ERROR << "Failed to serialize filters - JSON exception: " << je.what();
+            throw je;
+        }
 
-    vector<future<tuple<string, bool>>> requestFutures;
+        vector<future<tuple<string, bool>>> requestFutures;
 
-    unordered_set<string> uniqueEventIds;
+        unordered_set<string> uniqueEventIds;
 
-    // Send the same query to each relay.  As events trickle in from each relay, they will be added
-    // to the events vector.  Duplicate copies of the same event will be ignored, as events are
-    // stored on multiple relays.  The function will block until all of the relays send an EOSE or
-    // CLOSE message.
-    for (const string relay : this->_activeRelays)
-    {
-        promise<tuple<string, bool>> eosePromise;
-        requestFutures.push_back(move(eosePromise.get_future()));
+        // Send the same query to each relay.  As events trickle in from each relay, they will be added
+        // to the events vector.  Duplicate copies of the same event will be ignored, as events are
+        // stored on multiple relays.  The function will block until all of the relays send an EOSE or
+        // CLOSE message.
+        for (const string relay : this->_activeRelays)
+        {
+            promise<tuple<string, bool>> eosePromise;
+            requestFutures.push_back(move(eosePromise.get_future()));
 
-        auto [uri, success] = this->_client->send(
-            request,
-            relay,
-            [this, &relay, &events, &eosePromise, &uniqueEventIds](string payload)
-            {
-                this->onSubscriptionMessage(
-                    payload,
-                    [&events, &uniqueEventIds](const string&, shared_ptr<Event> event)
-                    {
-                        // Check if the event is unique before adding.
-                        if (uniqueEventIds.insert(event->id).second)
+            auto [uri, success] = this->_client->send(
+                request,
+                relay,
+                [this, &relay, &events, &eosePromise, &uniqueEventIds](string payload)
+                {
+                    this->onSubscriptionMessage(
+                        payload,
+                        [&events, &uniqueEventIds](const string&, shared_ptr<Event> event)
                         {
-                            events.push_back(event);
-                        }
-                    },
-                    [relay, &eosePromise](const string&)
-                    {
-                        eosePromise.set_value(make_tuple(relay, true));
-                    },
-                    [relay, &eosePromise](const string&, const string&)
-                    {
-                        eosePromise.set_value(make_tuple(relay, false));
-                    });
-            });
+                            // Check if the event is unique before adding.
+                            if (uniqueEventIds.insert(event->id).second)
+                            {
+                                events.push_back(event);
+                            }
+                        },
+                        [relay, &eosePromise](const string&)
+                        {
+                            eosePromise.set_value(make_tuple(relay, true));
+                        },
+                        [relay, &eosePromise](const string&, const string&)
+                        {
+                            eosePromise.set_value(make_tuple(relay, false));
+                        });
+                });
 
-        if (success)
-        {
-            PLOG_INFO << "Sent query to relay " << relay;
-            lock_guard<mutex> lock(this->_propertyMutex);
-            this->_subscriptions[subscriptionId].push_back(relay);
+            if (success)
+            {
+                PLOG_INFO << "Sent query to relay " << relay;
+                lock_guard<mutex> lock(this->_propertyMutex);
+                this->_subscriptions[subscriptionId].push_back(relay);
+            }
+            else
+            {
+                PLOG_WARNING << "Failed to send query to relay " << relay;
+                eosePromise.set_value(make_tuple(uri, false));
+            }
         }
-        else
-        {
-            PLOG_WARNING << "Failed to send query to relay " << relay;
-            eosePromise.set_value(make_tuple(uri, false));
-        }
-    }
 
-    // Close open subscriptions and disconnect from relays after events are received.
-    for (auto& publishFuture : requestFutures)
-    {
-        auto [relay, isEose] = publishFuture.get();
-        if (isEose)
-        {
-            PLOG_INFO << "Received EOSE message from relay " << relay;
-        }
-        else
-        {
-            PLOG_WARNING << "Received CLOSE message from relay " << relay;
-            this->closeRelayConnections({ relay });
-        }
-    }
-    this->closeSubscription(subscriptionId);
 
-    return events;
+        // Close open subscriptions and disconnect from relays after events are received.
+
+		for (auto& publishFuture : requestFutures)
+		{
+			auto [relay, isEose] = publishFuture.get();
+			if (isEose)
+			{
+				PLOG_INFO << "Received EOSE message from relay " << relay;
+			}
+			else
+			{
+				PLOG_WARNING << "Received CLOSE message from relay " << relay;
+				this->closeRelayConnections({ relay });
+			}
+		}
+		this->closeSubscription(subscriptionId);
+
+        return events;
+    });
 };
 
 string NostrService::queryRelays(
