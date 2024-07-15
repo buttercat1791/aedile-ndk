@@ -183,9 +183,9 @@ tuple<vector<string>, vector<string>> NostrService::publishEvent(shared_ptr<Even
 };
 
 // TODO: Add a timeout to this method to prevent hanging while waiting for the relay.
-std::future<vector<shared_ptr<Event>>> NostrService::queryRelays(shared_ptr<Filters> filters)
+future<vector<shared_ptr<Event>>> NostrService::queryRelays(shared_ptr<Filters> filters)
 {
-    return std::async(std::launch::async, [this, filters]() -> vector<shared_ptr<Event>>
+    return async(launch::async, [this, filters]() -> vector<shared_ptr<Event>>
     {
         if (filters->limit > 64 || filters->limit < 1)
         {
@@ -267,20 +267,20 @@ std::future<vector<shared_ptr<Event>>> NostrService::queryRelays(shared_ptr<Filt
 
         // Close open subscriptions and disconnect from relays after events are received.
 
-		for (auto& publishFuture : requestFutures)
-		{
-			auto [relay, isEose] = publishFuture.get();
-			if (isEose)
-			{
-				PLOG_INFO << "Received EOSE message from relay " << relay;
-			}
-			else
-			{
-				PLOG_WARNING << "Received CLOSE message from relay " << relay;
-				this->closeRelayConnections({ relay });
-			}
-		}
-		this->closeSubscription(subscriptionId);
+        for (auto& publishFuture : requestFutures)
+        {
+            auto [relay, isEose] = publishFuture.get();
+            if (isEose)
+            {
+                PLOG_INFO << "Received EOSE message from relay " << relay;
+            }
+            else
+            {
+                PLOG_WARNING << "Received CLOSE message from relay " << relay;
+                this->closeRelayConnections({ relay });
+            }
+        }
+        this->closeSubscription(subscriptionId);
 
         return events;
     });

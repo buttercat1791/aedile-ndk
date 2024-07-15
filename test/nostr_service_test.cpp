@@ -772,7 +772,7 @@ TEST_F(NostrServiceTest, QueryRelays_ReturnsEvents_UpToEOSE)
 
     auto filters = make_shared<nostr::Filters>(getKind0And1TestFilters());
 	
-	// await the future and get the results
+    // await the future and get the results
     auto results = nostrService->queryRelays(filters).get();
 
     // Check results size to ensure there are no duplicates.
