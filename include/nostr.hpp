@@ -177,7 +177,8 @@ public:
      * @brief Queries all open relay connections for events matching the given set of filters, and
      * returns all stored matching events returned by the relays.
      * @param filters The filters to use for the query.
-     * @returns A vector of all events matching the filters from all open relay connections.
+     * @returns A std::future that will eventually hold a vector of all events matching the filters
+     * from all open relay connections.
      * @remark This method runs until the relays send an EOSE message, indicating they have no more
      * stored events matching the given filters.  When the EOSE message is received, the method
      * will close the subscription for each relay and return the received events.
@@ -185,7 +186,7 @@ public:
      * set on the filters in the range 1-64, inclusive.  If no valid limit is given, it will be
      * defaulted to 16.
      */
-    std::vector<std::shared_ptr<Event>> queryRelays(std::shared_ptr<Filters> filters);
+    std::future<std::vector<std::shared_ptr<Event>>> queryRelays(std::shared_ptr<Filters> filters);
 
     /**
      * @brief Queries all open relay connections for events matching the given set of filters.
