@@ -2,7 +2,7 @@
 #include <plog/Log.h>
 #include <noscryptutil.h>
 
-#include <openssl/evp.h>
+#include <openssl/rand.h>
 
 #include "noscrypt_cipher.hpp"
 
@@ -44,10 +44,9 @@ static void _printNoscryptError(NCResult result, const std::string funcName, int
 
 #define LOG_NC_ERROR(result) _printNoscryptError(result, __func__, __LINE__)
 
-NoscryptCipher::NoscryptCipher(uint32_t version, uint32_t mode)
+NoscryptCipher::NoscryptCipher(uint32_t version, uint32_t mode) :
+ _cipher(version, mode)
 {
-    this->_cipher = NoscryptCipherContext(version, mode);
-
     /*
     * We can know what iv size we need for the cipher now and allocate
     * a buffer just to save some allocations and code during the
@@ -58,10 +57,10 @@ NoscryptCipher::NoscryptCipher(uint32_t version, uint32_t mode)
     if ((mode & NC_UTIL_CIPHER_MODE) == NC_UTIL_CIPHER_MODE_ENCRYPT)
     {
         //Resize the vector to the size of the current cipher
-        this->_ivBuffer.resize(&this->_cipher.ivSize());
+        this->_ivBuffer.resize(this->_cipher.ivSize());
 
         //Safe to assign the iv to the context now and it will maintain a pointer to the buffer
-		this->_cipher.setIV(&this->_ivBuffer);
+		this->_cipher.setIV(this->_ivBuffer);
     }
 }
 
@@ -83,7 +82,7 @@ std::string NoscryptCipher::update(
 	//Safely convert the string to a vector of bytes (allocates and copies, so maybe speed up later)
 	const vector<uint8_t> inputBuffer(input.begin(), input.end());
 
-	result = this->_cipher.setInput(&inputBuffer);
+	result = this->_cipher.setInput(inputBuffer);
     if (result != NC_SUCCESS)
     {
         LOG_NC_ERROR(result);
@@ -133,9 +132,9 @@ std::string NoscryptCipher::update(
     }
 
     //Alloc vector for reading input data (maybe only alloc once)
-    const vector<uint8_t> output(outputSize);
+    vector<uint8_t> output(outputSize);
 
-    result = this->_cipher.readOutput(&output);
+    result = this->_cipher.readOutput(output);
     if (result != outputSize)
     {
         LOG_NC_ERROR(result);

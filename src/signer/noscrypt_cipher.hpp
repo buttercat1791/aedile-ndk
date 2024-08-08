@@ -8,51 +8,11 @@ namespace nostr
 {
     namespace signer
     {
-        class NoscryptCipher
-        {
-        public:
-            NoscryptCipher(uint32_t version, uint32_t mode);
-
-            ~NoscryptCipher();
-
-            /*
-            * @brief Performs the cipher operation on the input data. Depending on the mode
-            * the cipher was initialized as, this will either encrypt or decrypt the data.
-            * @param libContext The noscrypt library context.
-            * @param localKey The local secret key used to encrypt/decrypt the data.
-            * @param remoteKey The remote public key used to encrypt/decrypt the data.
-            * @param input The data to encrypt/decrypt.
-            * @returns The opposite of the input data.
-            * @remark This cipher function follows the nostr nips format and will use do it's
-            * best to
-            */
-            std::string update(
-                const std::shared_ptr<const NCContext> libContext,
-                const std::shared_ptr<const NCSecretKey> localKey,
-                const std::shared_ptr<const NCPublicKey> remoteKey,
-                const std::string input
-            );
-
-            static std::string naiveEncodeBase64(const std::string& str)
-            {
-                //TODO Implement base64 encoding
-                return str;
-            }
-
-            static std::string naiveDecodeBase64(const std::string& str)
-            {
-                //TODO Implement base64 decoding
-                return str;
-            }
-
-        private:
-
-            NoscryptCipherContext _cipher;
-            std::vector<uint8_t> _ivBuffer;
-        };
-
         class NoscryptCipherContext
         {
+        private:
+            NCUtilCipherContext* _cipher;
+
         public:
 
 			NoscryptCipherContext(uint32_t version, uint32_t mode)
@@ -79,6 +39,8 @@ namespace nostr
 					version,
 					mode | NC_UTIL_CIPHER_ZERO_ON_FREE | NC_UTIL_CIPHER_REUSEABLE
 				);
+
+                //TODO, may fail to allocate memory.
 			}
 
 			~NoscryptCipherContext()
@@ -88,15 +50,15 @@ namespace nostr
 			}
 
 			NCResult update(
-				const shared_ptr<const NCContext>& libContext,
-				const shared_ptr<const NCSecretKey>& localKey,
-				const shared_ptr<const NCPublicKey>& remoteKey
-            )
+				const std::shared_ptr<const NCContext> libContext,
+				const std::shared_ptr<const NCSecretKey> localKey,
+				const std::shared_ptr<const NCPublicKey> remoteKey
+            ) const
 			{
-                return NCUtilCipherUpdate(this->_cipher, libContext.get(), localKey.get(), remoteKey.get());
+                return NCUtilCipherUpdate(_cipher, libContext.get(), localKey.get(), remoteKey.get());
 			}
 
-			NCResult setIV(const std::vector<uint8_t>& iv)
+			NCResult setIV(std::vector<uint8_t>& iv) const
 			{
                 return NCUtilCipherSetProperty(_cipher, NC_ENC_SET_IV, iv.data(), (uint32_t)iv.size());
 			}
@@ -132,7 +94,7 @@ namespace nostr
 				return (uint32_t)result;
             }
 
-            NCResult readOutput(const std::vector<uint8_t>& output) const
+            NCResult readOutput(std::vector<uint8_t>& output) const
             {
 				return NCUtilCipherReadOutput(_cipher, output.data(), (uint32_t)output.size());
             }
@@ -146,9 +108,53 @@ namespace nostr
 
                 return NCUtilCipherInit(_cipher, input.data(), input.size());
             }
+        };
+
+        class NoscryptCipher
+        {
 
         private:
-			NCUtilCipherContext* _cipher;
+            const NoscryptCipherContext _cipher;
+            /*
+			* Stores the initialziation vector (aka nonce for nip44) for the cipher.
+			* Noscrypt needs a memory buffer to store the iv, as it only holds pointers.
+            * 
+			* This buffer must always point to valid memory after the cipher is created.
+            */
+            std::vector<uint8_t> _ivBuffer;
+
+        public:
+            NoscryptCipher(uint32_t version, uint32_t mode);
+
+            /*
+            * @brief Performs the cipher operation on the input data. Depending on the mode
+            * the cipher was initialized as, this will either encrypt or decrypt the data.
+            * @param libContext The noscrypt library context.
+            * @param localKey The local secret key used to encrypt/decrypt the data.
+            * @param remoteKey The remote public key used to encrypt/decrypt the data.
+            * @param input The data to encrypt/decrypt.
+            * @returns The opposite of the input data.
+            * @remark This cipher function follows the nostr nips format and will use do it's
+            * best to
+            */
+            std::string update(
+                const std::shared_ptr<const NCContext> libContext,
+                const std::shared_ptr<const NCSecretKey> localKey,
+                const std::shared_ptr<const NCPublicKey> remoteKey,
+                const std::string& input
+            );
+
+            static std::string naiveEncodeBase64(const std::string& str)
+            {
+                //TODO Implement base64 encoding
+                return str;
+            }
+
+            static std::string naiveDecodeBase64(const std::string& str)
+            {
+                //TODO Implement base64 decoding
+                return str;
+            }
         };
     }
 }
