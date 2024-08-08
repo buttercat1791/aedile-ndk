@@ -1,6 +1,7 @@
 #pragma once
 
 #include <functional>
+#include <future>
 #include <memory>
 #include <mutex>
 #include <string>
@@ -146,9 +147,8 @@ public:
     std::tuple<std::vector<std::string>, std::vector<std::string>> publishEvent(
         std::shared_ptr<data::Event> event) override;
 
-    // TODO: Make this method return a promise.
     // TODO: Add a timeout to this method to prevent hanging while waiting for the relay.
-    std::vector<std::shared_ptr<data::Event>> queryRelays(
+    std::future<std::vector<std::shared_ptr<data::Event>>> queryRelays(
         std::shared_ptr<data::Filters> filters) override;
 
     std::string queryRelays(

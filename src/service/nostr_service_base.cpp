@@ -2,6 +2,7 @@
 #include <future>
 #include <stdexcept>
 #include <thread>
+#include <unordered_set>
 
 #include <uuid_v4.h>
 
@@ -191,7 +192,7 @@ tuple<vector<string>, vector<string>> NostrServiceBase::publishEvent(
 future<vector<shared_ptr<nostr::data::Event>>> NostrServiceBase::queryRelays(
     shared_ptr<nostr::data::Filters> filters)
 {
-    return async(launch::async, [this, filters]() -> vector<shared_ptr<Event>>
+    return async(launch::async, [this, filters]() -> vector<shared_ptr<nostr::data::Event>>
     {
         if (filters->limit > 64 || filters->limit < 1)
         {
@@ -199,9 +200,9 @@ future<vector<shared_ptr<nostr::data::Event>>> NostrServiceBase::queryRelays(
             filters->limit = 16;
         }
 
-        vector<shared_ptr<Event>> events;
+        vector<shared_ptr<nostr::data::Event>> events;
 
-        string subscriptionId = this->generateSubscriptionId();
+        string subscriptionId = this->_generateSubscriptionId();
         string request;
 
         try
@@ -237,9 +238,9 @@ future<vector<shared_ptr<nostr::data::Event>>> NostrServiceBase::queryRelays(
                 relay,
                 [this, &relay, &events, &eosePromise, &uniqueEventIds](string payload)
                 {
-                    this->onSubscriptionMessage(
+                    this->_onSubscriptionMessage(
                         payload,
-                        [&events, &uniqueEventIds](const string&, shared_ptr<Event> event)
+                        [&events, &uniqueEventIds](const string&, shared_ptr<nostr::data::Event> event)
                         {
                             // Check if the event is unique before adding.
                             if (uniqueEventIds.insert(event->id).second)
