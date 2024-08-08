@@ -12,6 +12,7 @@
 #include <uuid_v4.h>
 
 #include "signer/noscrypt_signer.hpp"
+#include "noscrypt_cipher.hpp"
 
 using namespace nostr::data;
 using namespace nostr::service;
@@ -532,92 +533,32 @@ string NoscryptSigner::_decryptNip04(string input)
 
 string NoscryptSigner::_encryptNip44(string input)
 {
-    uint32_t nip44Version = 0x02;
+    NoscryptCipher cipher = NoscryptCipher(NC_ENC_VERSION_NIP44, NC_UTIL_CIPHER_MODE_ENCRYPT);
 
-    auto nonce = make_shared<uint8_t>(32);
-    auto hmacKey = make_shared<uint8_t>(32);
+	auto output = cipher.update(
+		this->_noscryptContext,
+		this->_localPrivateKey,
+		this->_remotePublicKey,
+		input
+    );
 
-    uint32_t bufferSize = input.length();
-    auto output = make_shared<uint8_t>(bufferSize);
-
-    // Generate a nonce to use for the encryption.
-    int code = RAND_bytes(nonce.get(), 32);
-    if (code <= 0)
-    {
-        PLOG_ERROR << "Failed to generate a nonce for NIP-44 encryption.";
-        return string();
-    }
-
-    // Setup the encryption context.
-    auto encryptionArgs = make_unique<NCEncryptionArgs>(NCEncryptionArgs
-    {
-        nonce.get(),
-        hmacKey.get(),
-        reinterpret_cast<uint8_t*>(input.data()),
-        output.get(),
-        bufferSize,
-        nip44Version
-    });
-
-    // Perform the encryption.
-    NCResult encryptionResult = NCEncrypt(
-        this->_noscryptContext.get(),
-        this->_localPrivateKey.get(),
-        this->_remotePublicKey.get(),
-        encryptionArgs.get());
-    
-    // TODO: Handle various codes.
-    if (encryptionResult != NC_SUCCESS)
-    {
-        return string();
-    }
-
-    return string((char*)output.get(), bufferSize);
+    return output.empty()
+        ? string()
+        : NoscryptCipher::naiveEncodeBase64(output);
 };
 
 string NoscryptSigner::_decryptNip44(string input)
 {
-    uint32_t nip44Version = 0x02;
+    //TODO handle input validation as per nip44 spec
 
-    auto nonce = make_shared<uint8_t>(32);
-    auto hmacKey = make_shared<uint8_t>(32);
+    NoscryptCipher cipher = NoscryptCipher(NC_ENC_VERSION_NIP44, NC_UTIL_CIPHER_MODE_DECRYPT);
 
-    uint32_t bufferSize = input.length();
-    auto output = make_shared<uint8_t>(bufferSize);
-
-    // Generate a nonce to use for the decryption.
-    int code = RAND_bytes(nonce.get(), 32);
-    if (code <= 0)
-    {
-        PLOG_ERROR << "Failed to generate a nonce for NIP-44 decryption.";
-        return string();
-    }
-
-    // Set up the decryption context.
-    auto decryptionArgs = make_unique<NCEncryptionArgs>(NCEncryptionArgs
-    {
-        nonce.get(),
-        hmacKey.get(),
-        reinterpret_cast<uint8_t*>(input.data()),
-        output.get(),
-        bufferSize,
-        nip44Version
-    });
-
-    // Perform the decryption.
-    NCResult decryptionResult = NCDecrypt(
-        this->_noscryptContext.get(),
-        this->_localPrivateKey.get(),
-        this->_remotePublicKey.get(),
-        decryptionArgs.get());
-
-    // TODO: Handle various codes.
-    if (decryptionResult != NC_SUCCESS)
-    {
-        return string();
-    }
-
-    return string((char*)output.get(), bufferSize);
+    return cipher.update(
+        this->_noscryptContext,
+        this->_localPrivateKey,
+        this->_remotePublicKey,
+        NoscryptCipher::naiveDecodeBase64(input)
+    );
 };
 
 #pragma endregion
@@ -626,7 +567,7 @@ string NoscryptSigner::_decryptNip44(string input)
 
 inline void NoscryptSigner::_logNoscryptInitResult(NCResult initResult) const
 {
-    switch (initResult) {
+    switch (NCParseErrorCode(initResult, NULL)) {
     case NC_SUCCESS:
         PLOG_INFO << "noscrypt - success";
         break;
@@ -655,7 +596,7 @@ inline void NoscryptSigner::_logNoscryptInitResult(NCResult initResult) const
 
 inline void NoscryptSigner::_logNoscryptSecretValidationResult(NCResult secretValidationResult) const
 {
-    if (secretValidationResult == NC_SUCCESS)
+    if (NCParseErrorCode(secretValidationResult, NULL) == NC_SUCCESS)
     {
         PLOG_INFO << "noscrypt_signer - success: Generated a valid secret key.";
     }
@@ -667,7 +608,8 @@ inline void NoscryptSigner::_logNoscryptSecretValidationResult(NCResult secretVa
 
 inline void NoscryptSigner::_logNoscryptPubkeyGenerationResult(NCResult pubkeyGenerationResult) const
 {
-    switch (pubkeyGenerationResult) {
+
+    switch (NCParseErrorCode(pubkeyGenerationResult, NULL)) {
     case NC_SUCCESS:
         PLOG_INFO << "noscrypt - success: Generated a valid public key.";
         break;

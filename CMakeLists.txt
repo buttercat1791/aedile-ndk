@@ -57,7 +57,7 @@ include_directories(${uuid_v4_SOURCE_DIR})
 FetchContent_Declare(
     libnoscrypt
     GIT_REPOSITORY git@github.com:VnUgE/noscrypt.git
-    GIT_TAG v0.1.2
+    GIT_TAG fb3608b9455b3e0956e401e6254da13cebd71558
 )
 FetchContent_MakeAvailable(libnoscrypt)
 
@@ -65,6 +65,7 @@ FetchContent_GetProperties(libnoscrypt)
 include_directories(${libnoscrypt_SOURCE_DIR}/include)
 
 set_target_properties(noscrypt PROPERTIES CRYPTO_LIB openssl)
+set_target_properties(noscrypt PROPERTIES NC_ENABLE_UTILS ON)   #utilities library is required
 
 #======== Build the project ========#
 set(INCLUDE_DIR ./include)
@@ -98,6 +99,7 @@ set(SOURCES
     ${DATA_SOURCE_DIR}/filters.cpp
     ${SERVICE_SOURCE_DIR}/nostr_service_base.cpp
     ${SIGNER_SOURCE_DIR}/noscrypt_signer.cpp
+    ${SIGNER_SOURCE_DIR}/noscrypt_cipher.cpp
 )
 
 add_library(aedile ${SOURCES} ${HEADERS})
