@@ -11,7 +11,7 @@ string Filters::serialize(string& subscriptionId)
     try
     {
         this->validate();
-    } 
+    }
     catch (const invalid_argument& e)
     {
         throw e;
