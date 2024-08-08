@@ -1,9 +1,10 @@
 cmake_minimum_required(VERSION 3.19)
-project(aedile VERSION 0.0.3)
 
-if(CMAKE_VERSION VERSION_GREATER_EQUAL "3.24")
-    cmake_policy(SET CMP0135 NEW)
+if(CMAKE_VERSION VERSION_GREATER "3.24.0")
+  # FIXME this policy isn't compatible with versions prior to 3.24
+  cmake_policy(SET CMP0135 NEW)
 endif()
+project(aedile VERSION 0.0.3)
 
 include(ExternalProject)
 include(FetchContent)
@@ -43,6 +44,7 @@ find_package(plog CONFIG REQUIRED)
 find_package(websocketpp CONFIG REQUIRED)
 
 #======== Configure uuid_v4 ========#
+
 FetchContent_Declare(
     uuid_v4
     GIT_REPOSITORY git@github.com:crashoz/uuid_v4.git
@@ -102,7 +104,7 @@ set(SOURCES
     ${SIGNER_SOURCE_DIR}/noscrypt_cipher.cpp
 )
 
-add_library(aedile ${SOURCES} ${HEADERS})
+add_library(aedile ${SOURCES})
 target_link_libraries(aedile PRIVATE
     nlohmann_json::nlohmann_json
     OpenSSL::SSL
@@ -111,6 +113,7 @@ target_link_libraries(aedile PRIVATE
     websocketpp::websocketpp
     noscrypt
 )
+target_include_directories(aedile PUBLIC ${INCLUDE_DIR})
 set_target_properties(aedile PROPERTIES WINDOWS_EXPORT_ALL_SYMBOLS YES)
 
 #======== Build the tests ========#

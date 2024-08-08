@@ -1,6 +1,7 @@
 #pragma once
 
 #include <functional>
+#include <future>
 #include <memory>
 #include <mutex>
 #include <string>
@@ -58,7 +59,8 @@ public:
      * @brief Queries all open relay connections for events matching the given set of filters, and
      * returns all stored matching events returned by the relays.
      * @param filters The filters to use for the query.
-     * @returns A vector of all events matching the filters from all open relay connections.
+     * @returns A std::future that will eventually hold a vector of all events matching the filters
+     * from all open relay connections.
      * @remark This method runs until the relays send an EOSE message, indicating they have no more
      * stored events matching the given filters.  When the EOSE message is received, the method
      * will close the subscription for each relay and return the received events.
@@ -66,7 +68,7 @@ public:
      * set on the filters in the range 1-64, inclusive.  If no valid limit is given, it will be
      * defaulted to 16.
      */
-    virtual std::vector<std::shared_ptr<data::Event>> queryRelays(
+    virtual std::future<std::vector<std::shared_ptr<data::Event>>> queryRelays(
         std::shared_ptr<data::Filters> filters) = 0;
 
     /**
@@ -145,9 +147,8 @@ public:
     std::tuple<std::vector<std::string>, std::vector<std::string>> publishEvent(
         std::shared_ptr<data::Event> event) override;
 
-    // TODO: Make this method return a promise.
     // TODO: Add a timeout to this method to prevent hanging while waiting for the relay.
-    std::vector<std::shared_ptr<data::Event>> queryRelays(
+    std::future<std::vector<std::shared_ptr<data::Event>>> queryRelays(
         std::shared_ptr<data::Filters> filters) override;
 
     std::string queryRelays(
