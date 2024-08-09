@@ -60,7 +60,7 @@ NoscryptCipher::NoscryptCipher(uint32_t version, uint32_t mode) :
         this->_ivBuffer.resize(this->_cipher.ivSize());
 
         //Safe to assign the iv to the context now and it will maintain a pointer to the buffer
-		this->_cipher.setIV(this->_ivBuffer);
+        this->_cipher.setIV(this->_ivBuffer);
     }
 }
 
@@ -79,10 +79,10 @@ std::string NoscryptCipher::update(
         return string();
     }
 
-	//Safely convert the string to a vector of bytes (allocates and copies, so maybe speed up later)
-	const vector<uint8_t> inputBuffer(input.begin(), input.end());
+    //Safely convert the string to a vector of bytes (allocates and copies, so maybe speed up later)
+    const vector<uint8_t> inputBuffer(input.begin(), input.end());
 
-	result = this->_cipher.setInput(inputBuffer);
+result = this->_cipher.setInput(inputBuffer);
     if (result != NC_SUCCESS)
     {
         LOG_NC_ERROR(result);
@@ -141,5 +141,5 @@ std::string NoscryptCipher::update(
         return string();
     }
 
-	return string(output.begin(), output.end());
+    return string(output.begin(), output.end());
 }
