@@ -1,3 +1,4 @@
+#pragma once
 
 #include <memory>
 
@@ -6,7 +7,7 @@
 
 namespace nostr
 {
-namespace signer
+namespace cryptography
 {
 class NoscryptCipherContext
 {
@@ -144,17 +145,29 @@ public:
         const std::string& input
     );
 
-    static std::string naiveEncodeBase64(const std::string& str)
+    /**
+     * @brief Computes the length of a base64 encoded string.
+     * @param n The length of the string to be encoded.
+     * @return The length of the resulting base64 encoded string.
+     */
+    inline static size_t base64EncodedSize(const size_t n)
     {
-        //TODO Implement base64 encoding
-        return str;
-    }
+        return (((n + 2) / 3) << 2) + 1;
+    };
 
-    static std::string naiveDecodeBase64(const std::string& str)
+    /**
+     * @brief Computes the length of a string decoded from base64.
+     * @param n The length of the base64 encoded string.
+     * @return The length of the decoded string.
+     */
+    inline static size_t base64DecodedSize(const size_t n)
     {
-        //TODO Implement base64 decoding
-        return str;
-    }
+        return (n * 3) >> 2;
+    };
+
+    static std::string naiveEncodeBase64(const std::string& str);
+
+    static std::string naiveDecodeBase64(const std::string& str);
 };
-} // namespace signer
+} // namespace cryptography
 } // namespace nostr

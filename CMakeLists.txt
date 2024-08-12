@@ -72,11 +72,13 @@ set_target_properties(noscrypt PROPERTIES NC_ENABLE_UTILS ON)   #utilities libra
 #======== Build the project ========#
 set(INCLUDE_DIR ./include)
 set(CLIENT_INCLUDE_DIR ./include/client)
+set(CRYPTOGRAPHY_INCLUDE_DIR ./include/cryptography)
 set(DATA_INCLUDE_DIR ./include/data)
 set(SERVICE_INCLUDE_DIR ./include/service)
 set(SIGNER_INCLUDE_DIR ./include/signer)
 include_directories(${INCLUDE_DIR})
 include_directories(${CLIENT_INCLUDE_DIR})
+include_directories(${CRYPTOGRAPHY_INCLUDE_DIR})
 include_directories(${DATA_INCLUDE_DIR})
 include_directories(${SIGNER_INCLUDE_DIR})
 
@@ -84,6 +86,7 @@ set(HEADERS
     ${INCLUDE_DIR}/nostr.hpp
     ${CLIENT_INCLUDE_DIR}/web_socket_client.hpp
     ${CLIENT_INCLUDE_DIR}/websocketpp_client.hpp
+    ${CRYPTOGRAPHY_INCLUDE_DIR}/noscrypt_cipher.hpp
     ${DATA_INCLUDE_DIR}/data.hpp
     ${SERVICE_INCLUDE_DIR}/nostr_service_base.hpp
     ${SIGNER_INCLUDE_DIR}/signer.hpp
@@ -92,16 +95,17 @@ set(HEADERS
 
 set(SOURCE_DIR ./src)
 set(CLIENT_SOURCE_DIR ./src/client)
+set(CRYPTOGRAPHY_SOURCE_DIR ./src/cryptography)
 set(DATA_SOURCE_DIR ./src/data)
 set(SERVICE_SOURCE_DIR ./src/service)
 set(SIGNER_SOURCE_DIR ./src/signer)
 set(SOURCES
     ${CLIENT_SOURCE_DIR}/websocketpp_client.cpp
+    ${CRYPTOGRAPHY_SOURCE_DIR}/noscrypt_cipher.cpp
     ${DATA_SOURCE_DIR}/event.cpp
     ${DATA_SOURCE_DIR}/filters.cpp
     ${SERVICE_SOURCE_DIR}/nostr_service_base.cpp
     ${SIGNER_SOURCE_DIR}/noscrypt_signer.cpp
-    ${SIGNER_SOURCE_DIR}/noscrypt_cipher.cpp
 )
 
 add_library(aedile ${SOURCES})

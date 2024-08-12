@@ -1,12 +1,12 @@
 #include <plog/Init.h>
 #include <plog/Log.h>
-#include <noscryptutil.h>
 
+#include <openssl/evp.h>
 #include <openssl/rand.h>
 
-#include "noscrypt_cipher.hpp"
+#include "cryptography/noscrypt_cipher.hpp"
 
-using namespace nostr::signer;
+using namespace nostr::cryptography;
 using namespace std;
 
 static void _printNoscryptError(NCResult result, const std::string funcName, int lineNum)
@@ -143,3 +143,41 @@ result = this->_cipher.setInput(inputBuffer);
 
     return string(output.begin(), output.end());
 }
+
+string NoscryptCipher::naiveEncodeBase64(const std::string& str)
+{
+    // Compute base64 size and allocate a string buffer of that size.
+    const size_t encodedSize = NoscryptCipher::base64EncodedSize(str.size());
+    unsigned char* encodedData = new unsigned char[encodedSize];
+
+    // Encode the input string to base64.
+    EVP_EncodeBlock(encodedData, (const unsigned char*)str.data(), str.size());
+
+    // Construct the encoded string from the buffer.
+    string encodedStr((char*)encodedData);
+
+    // Zero out the buffer and delete the pointer.
+    memset(encodedData, 0, encodedSize);
+    delete [] encodedData;
+
+    return encodedStr;
+}
+
+string NoscryptCipher::naiveDecodeBase64(const string& str)
+{
+    // Compute the size of the decoded string and allocate a buffer of that size.
+    const size_t decodedSize = NoscryptCipher::base64DecodedSize(str.size());
+    unsigned char* decodedData = new unsigned char[decodedSize];
+
+    // Decode the input string from base64.
+    EVP_DecodeBlock(decodedData, (const unsigned char*)str.data(), str.size());
+
+    // Construct the decoded string from the buffer.
+    string decodedStr((char*)decodedData);
+
+    // Zero out the buffer and delete the pointer.
+    memset(decodedData, 0, decodedSize);
+    delete [] decodedData;
+
+    return decodedStr;
+};

@@ -17,6 +17,7 @@
 using namespace nostr::data;
 using namespace nostr::service;
 using namespace nostr::signer;
+using namespace nostr::cryptography;
 using namespace std;
 
 #pragma region Constructors and Destructors
