@@ -2,23 +2,40 @@
 #include <chrono>
 #include <cstring>
 #include <memory>
-#include <random>
 #include <sstream>
 #include <tuple>
 
 #include <nlohmann/json.hpp>
-#include <openssl/err.h>
-#include <openssl/rand.h>
 #include <uuid_v4.h>
 
 #include "signer/noscrypt_signer.hpp"
-#include "noscrypt_cipher.hpp"
+#include "../cryptography/nostr_secure_rng.hpp"
+#include "../cryptography/noscrypt_cipher.hpp"
 
+using namespace std;
 using namespace nostr::data;
 using namespace nostr::service;
 using namespace nostr::signer;
 using namespace nostr::cryptography;
-using namespace std;
+
+static void _ncFreeContext(NCContext* ctx)
+{
+	operator delete(ctx);
+}
+
+static shared_ptr<NCContext> ncAllocContext()
+{
+    /* Allocates a new unmanaged block that will 
+    * be freed manually with the above helper when the smart 
+    * pointer is destroyed
+    */
+	void* ctxMemory = operator new(NCGetContextStructSize());
+
+	return shared_ptr<NCContext>(
+        static_cast<NCContext*>(ctxMemory), 
+        _ncFreeContext
+    );
+}
 
 #pragma region Constructors and Destructors
 
@@ -28,7 +45,7 @@ NoscryptSigner::NoscryptSigner(
 {
     plog::init(plog::debug, appender.get());
 
-    this->_reseedRandomNumberGenerator();
+    NostrSecureRng::reseed();
     this->_initNoscryptContext();
     this->_createLocalKeypair();
 
@@ -258,21 +275,21 @@ inline void NoscryptSigner::_setRemotePublicKey(const string value)
 
 #pragma region Setup
 
+
 void NoscryptSigner::_initNoscryptContext()
-{
-    shared_ptr<NCContext> context;
-    auto contextStructSize = NCGetContextStructSize();
-    auto randomEntropy = make_unique<uint8_t>(contextStructSize);
+{    
+    //Use helper to allocate a dynamic sized shared pointer
+    this->_noscryptContext = ncAllocContext();
 
-    random_device rd;
-    mt19937 gen(rd());
-    uniform_int_distribution<> dist(0, contextStructSize);
-    generate_n(randomEntropy.get(), contextStructSize, [&]() { return dist(gen); });
+    auto randomEntropy = make_unique<uint8_t>(NC_CONTEXT_ENTROPY_SIZE);
+	NostrSecureRng::fill(randomEntropy.get(), NC_CONTEXT_ENTROPY_SIZE);
 
-    NCResult initResult = NCInitContext(context.get(), randomEntropy.get());
+    NCResult initResult = NCInitContext(
+        this->_noscryptContext.get(),     
+        randomEntropy.get()
+    );
+    
     this->_logNoscryptInitResult(initResult);
-
-    this->_noscryptContext = move(context);
 };
 
 /**
@@ -296,14 +313,13 @@ void NoscryptSigner::_createLocalKeypair()
     int loopCount = 0;
     do
     {
-        int rc = RAND_bytes(secret->key, sizeof(NCSecretKey));
-        if (rc != 1)
-        {
-            unsigned long err = ERR_get_error();
-            PLOG_ERROR << "OpenSSL error " << err << " occurred while generating a secret key.";
-        }
+		NostrSecureRng::fill(secret.get(), sizeof(NCSecretKey));
 
-        secretValidationResult = NCValidateSecretKey(this->_noscryptContext.get(), secret.get());
+        secretValidationResult = NCValidateSecretKey(
+            this->_noscryptContext.get(), 
+            secret.get()
+        );
+
     } while (secretValidationResult != NC_SUCCESS && ++loopCount < 64);
 
     this->_logNoscryptSecretValidationResult(secretValidationResult);
@@ -311,10 +327,13 @@ void NoscryptSigner::_createLocalKeypair()
 
     // Use noscrypt to derive the public key from its private counterpart.
     auto pubkey = make_unique<NCPublicKey>();
+    
     NCResult pubkeyGenerationResult = NCGetPublicKey(
         this->_noscryptContext.get(),
         secret.get(),
-        pubkey.get());
+        pubkey.get()
+    );
+    
     this->_logNoscryptPubkeyGenerationResult(pubkeyGenerationResult);
     this->_localPublicKey = move(pubkey);
 };
@@ -403,26 +422,26 @@ shared_ptr<Event> NoscryptSigner::_wrapSignerMessage(nlohmann::json jrpc)
     wrapperEvent->tags.push_back({ "p", this->_getRemotePublicKey() });
     wrapperEvent->content = encryptedContent;
 
-    // Generate a random seed for the signer.
-    auto random32 = make_shared<uint8_t>(32);
-    int code = RAND_bytes(random32.get(), 32);
-    if (code <= 0)
-    {
-        PLOG_ERROR << "Failed to generate a random 32-byte seed buffer for the signer.";
-        return nullptr;
-    }
+    uint8_t schnorrSig[64];
+	uint8_t random32[32];
+   
+    //Secure random signing entropy is required
+	NostrSecureRng::fill(random32, sizeof(random32));
 
     // Sign the wrapper message with the local secret key.
     string serializedEvent = wrapperEvent->serialize();
-    uint32_t dataSize = serializedEvent.length();
-    auto signature = make_unique<uint8_t>(64);
+
     NCResult signatureResult = NCSignData(
         this->_noscryptContext.get(),
         this->_localPrivateKey.get(),
-        random32.get(),
-        reinterpret_cast<uint8_t*>(serializedEvent.data()),
-        dataSize,
-        signature.get());
+        random32,
+        reinterpret_cast<const uint8_t*>(serializedEvent.c_str()),
+        serializedEvent.length(),
+        schnorrSig
+    );
+
+    //Random buffer could leak sensitive signing information
+    NostrSecureRng::zero(random32, sizeof(random32));
 
     // TODO: Handle result codes.
     if (signatureResult != NC_SUCCESS)
@@ -431,7 +450,10 @@ shared_ptr<Event> NoscryptSigner::_wrapSignerMessage(nlohmann::json jrpc)
     }
 
     // Add the signature to the event.
-    wrapperEvent->sig = string((char*)signature.get(), 64);
+    wrapperEvent->sig = string(
+        reinterpret_cast<char*>(schnorrSig), 
+        sizeof(schnorrSig)
+    );
 
     return wrapperEvent;
 };
@@ -512,16 +534,6 @@ promise<bool> NoscryptSigner::_pingSigner()
 
 #pragma region Cryptography
 
-void NoscryptSigner::_reseedRandomNumberGenerator(uint32_t bufferSize)
-{
-    int rc = RAND_load_file("/dev/random", bufferSize);
-    if (rc != bufferSize)
-    {
-        PLOG_WARNING << "Failed to reseed the RNG with /dev/random, falling back to /dev/urandom.";
-        RAND_poll();
-    }
-};
-
 string NoscryptSigner::_encryptNip04(std::string input)
 {
     throw runtime_error("NIP-04 encryption is not yet implemented.");
@@ -534,7 +546,10 @@ string NoscryptSigner::_decryptNip04(string input)
 
 string NoscryptSigner::_encryptNip44(string input)
 {
-    NoscryptCipher cipher = NoscryptCipher(NC_ENC_VERSION_NIP44, NC_UTIL_CIPHER_MODE_ENCRYPT);
+    NoscryptCipher cipher = NoscryptCipher(
+        NoscryptCipherVersion::NIP44,
+        NoscryptCipherMode::CIPHER_MODE_ENCRYPT
+    );
 
 	auto output = cipher.update(
 		this->_noscryptContext,
@@ -552,7 +567,10 @@ string NoscryptSigner::_decryptNip44(string input)
 {
     //TODO handle input validation as per nip44 spec
 
-    NoscryptCipher cipher = NoscryptCipher(NC_ENC_VERSION_NIP44, NC_UTIL_CIPHER_MODE_DECRYPT);
+    NoscryptCipher cipher = NoscryptCipher(
+        NoscryptCipherVersion::NIP44, 
+        NoscryptCipherMode::CIPHER_MODE_DECRYPT
+    );
 
     return cipher.update(
         this->_noscryptContext,

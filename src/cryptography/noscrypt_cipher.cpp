@@ -2,12 +2,12 @@
 #include <plog/Log.h>
 
 #include <openssl/evp.h>
-#include <openssl/rand.h>
 
-#include "cryptography/noscrypt_cipher.hpp"
+#include "nostr_secure_rng.hpp"
+#include "noscrypt_cipher.hpp"
 
-using namespace nostr::cryptography;
 using namespace std;
+using namespace nostr::cryptography;
 
 static void _printNoscryptError(NCResult result, const std::string funcName, int lineNum)
 {
@@ -44,7 +44,7 @@ static void _printNoscryptError(NCResult result, const std::string funcName, int
 
 #define LOG_NC_ERROR(result) _printNoscryptError(result, __func__, __LINE__)
 
-NoscryptCipher::NoscryptCipher(uint32_t version, uint32_t mode) :
+NoscryptCipher::NoscryptCipher(NoscryptCipherVersion version, NoscryptCipherMode mode) :
  _cipher(version, mode)
 {
     /*
@@ -54,7 +54,7 @@ NoscryptCipher::NoscryptCipher(uint32_t version, uint32_t mode) :
     * operation.
     */
 
-    if ((mode & NC_UTIL_CIPHER_MODE) == NC_UTIL_CIPHER_MODE_ENCRYPT)
+    if (mode == NoscryptCipherMode::CIPHER_MODE_ENCRYPT)
     {
         //Resize the vector to the size of the current cipher
         this->_ivBuffer.resize(this->_cipher.ivSize());
@@ -82,7 +82,7 @@ std::string NoscryptCipher::update(
     //Safely convert the string to a vector of bytes (allocates and copies, so maybe speed up later)
     const vector<uint8_t> inputBuffer(input.begin(), input.end());
 
-result = this->_cipher.setInput(inputBuffer);
+    result = this->_cipher.setInput(inputBuffer);
     if (result != NC_SUCCESS)
     {
         LOG_NC_ERROR(result);
@@ -97,18 +97,10 @@ result = this->_cipher.setInput(inputBuffer);
     * Keep in mind, this will automatically work for nip44 and nip04, either the
     * AES iv or the ChaCha nonce.
     */
-    if ((this->_cipher.flags() & NC_UTIL_CIPHER_MODE) == NC_UTIL_CIPHER_MODE_ENCRYPT)
+    if (this->_cipher.mode() == NoscryptCipherMode::CIPHER_MODE_ENCRYPT)
     {
-        int code = RAND_bytes(
-            this->_ivBuffer.data(),
-            this->_ivBuffer.size()  //Size set in constructor
-        );
-
-        if (code <= 0)
-        {
-            PLOG_ERROR << "Failed to generate a nonce or IV for encryption.";
-            return string();
-        }
+		//A secure random initialization vector is needed for encryption operations
+		NostrSecureRng::fill(this->_ivBuffer);
     }
 
     //Performs the operation (either encryption or decryption) 
@@ -148,36 +140,40 @@ string NoscryptCipher::naiveEncodeBase64(const std::string& str)
 {
     // Compute base64 size and allocate a string buffer of that size.
     const size_t encodedSize = NoscryptCipher::base64EncodedSize(str.size());
-    unsigned char* encodedData = new unsigned char[encodedSize];
+    
+    unique_ptr<uint8_t> encodedData = make_unique<uint8_t>(encodedSize);
 
     // Encode the input string to base64.
-    EVP_EncodeBlock(encodedData, (const unsigned char*)str.data(), str.size());
+    EVP_EncodeBlock(
+        encodedData.get(),
+        reinterpret_cast<const uint8_t*>(str.c_str()),
+        str.size()
+    );
 
     // Construct the encoded string from the buffer.
-    string encodedStr((char*)encodedData);
-
-    // Zero out the buffer and delete the pointer.
-    memset(encodedData, 0, encodedSize);
-    delete [] encodedData;
-
-    return encodedStr;
+    return string(
+        reinterpret_cast<char*>(encodedData.get()),
+        encodedSize
+    );
 }
 
 string NoscryptCipher::naiveDecodeBase64(const string& str)
 {
     // Compute the size of the decoded string and allocate a buffer of that size.
     const size_t decodedSize = NoscryptCipher::base64DecodedSize(str.size());
-    unsigned char* decodedData = new unsigned char[decodedSize];
+  
+    unique_ptr<uint8_t> decodedData = make_unique<uint8_t>(decodedSize);
 
     // Decode the input string from base64.
-    EVP_DecodeBlock(decodedData, (const unsigned char*)str.data(), str.size());
+    EVP_DecodeBlock(
+        decodedData.get(),
+        reinterpret_cast<const uint8_t*>(str.c_str()),
+        str.size()
+    );
 
     // Construct the decoded string from the buffer.
-    string decodedStr((char*)decodedData);
-
-    // Zero out the buffer and delete the pointer.
-    memset(decodedData, 0, decodedSize);
-    delete [] decodedData;
-
-    return decodedStr;
+    return string(
+        reinterpret_cast<char*>(decodedData.get()),
+        decodedSize
+    );
 };
