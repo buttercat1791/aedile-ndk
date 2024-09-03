@@ -2,5 +2,7 @@ maintainers:
 - npub1wqfzz2p880wq0tumuae9lfwyhs8uz35xd0kr34zrvrwyh3kvrzuskcqsyn
 - npub1ecdlntvjzexlyfale2egzvvncc8tgqsaxkl5hw7xlgjv2cxs705s9qs735
 relays:
-- wss://theforest.nostr1.com/
-- wss://nostr.thesamecat.io/
+- wss://theforest.nostr1.com
+- wss://thecitadel.nostr1.com
+- wss://nostr.wine
+- wss://nostr.thesamecat.io
