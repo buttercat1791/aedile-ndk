@@ -5,44 +5,11 @@
 
 #include "nostr_secure_rng.hpp"
 #include "noscrypt_cipher.hpp"
+#include "../internal/noscrypt_logger.hpp"
 
 using namespace std;
 using namespace nostr::cryptography;
 
-static void _printNoscryptError(NCResult result, const std::string funcName, int lineNum)
-{
-    uint8_t argPosition;
-
-    switch (NCParseErrorCode(result, &argPosition))
-    {
-    case E_NULL_PTR:
-        PLOG_ERROR << "noscrypt - error: A null pointer was passed in " << funcName << "(" << argPosition << ") at line " << lineNum;
-        break;
-
-    case E_INVALID_ARG:
-        PLOG_ERROR << "noscrypt - error: An invalid argument was passed in " << funcName << "(" << argPosition << ") at line " << lineNum;
-        break;
-
-    case E_INVALID_CONTEXT:
-        PLOG_ERROR << "noscrypt - error: An invalid context was passed in " << funcName << "(" << argPosition << ") on line " << lineNum;
-        break;
-
-    case E_ARGUMENT_OUT_OF_RANGE:
-        PLOG_ERROR << "noscrypt - error: An argument was out of range in " << funcName << "(" << argPosition << ") at line " << lineNum;
-        break;
-
-    case E_OPERATION_FAILED:
-        PLOG_ERROR << "noscrypt - error: An operation failed in " << funcName << "(" << argPosition << ") at line " << lineNum;
-        break;
-
-    default:
-        PLOG_ERROR << "noscrypt - error: An unknown error " << result << " occurred in " << funcName << "(" << argPosition << ") at line " << lineNum;
-        break;
-    }
-
-}
-
-#define LOG_NC_ERROR(result) _printNoscryptError(result, __func__, __LINE__)
 
 NoscryptCipher::NoscryptCipher(NoscryptCipherVersion version, NoscryptCipherMode mode) :
  _cipher(version, mode)
@@ -85,7 +52,7 @@ std::string NoscryptCipher::update(
     result = this->_cipher.setInput(inputBuffer);
     if (result != NC_SUCCESS)
     {
-        LOG_NC_ERROR(result);
+        NC_LOG_ERROR(result);
         return string();
     }
 
@@ -107,7 +74,7 @@ std::string NoscryptCipher::update(
     result = this->_cipher.update(libContext, localKey, remoteKey);
     if (result != NC_SUCCESS)
     {
-        LOG_NC_ERROR(result);
+        NC_LOG_ERROR(result);
         return string();
     }
 
@@ -119,7 +86,7 @@ std::string NoscryptCipher::update(
     NCResult outputSize = this->_cipher.outputSize();
     if (outputSize <= 0)
     {
-        LOG_NC_ERROR(outputSize);
+        NC_LOG_ERROR(outputSize);
         return string();
     }
 
@@ -129,7 +96,7 @@ std::string NoscryptCipher::update(
     result = this->_cipher.readOutput(output);
     if (result != outputSize)
     {
-        LOG_NC_ERROR(result);
+        NC_LOG_ERROR(result);
         return string();
     }
 
@@ -141,7 +108,7 @@ string NoscryptCipher::naiveEncodeBase64(const std::string& str)
     // Compute base64 size and allocate a string buffer of that size.
     const size_t encodedSize = NoscryptCipher::base64EncodedSize(str.size());
     
-    unique_ptr<uint8_t> encodedData = make_unique<uint8_t>(encodedSize);
+    auto encodedData = make_unique<uint8_t>(encodedSize);
 
     // Encode the input string to base64.
     EVP_EncodeBlock(
@@ -162,7 +129,7 @@ string NoscryptCipher::naiveDecodeBase64(const string& str)
     // Compute the size of the decoded string and allocate a buffer of that size.
     const size_t decodedSize = NoscryptCipher::base64DecodedSize(str.size());
   
-    unique_ptr<uint8_t> decodedData = make_unique<uint8_t>(decodedSize);
+    auto decodedData = make_unique<uint8_t>(decodedSize);
 
     // Decode the input string from base64.
     EVP_DecodeBlock(

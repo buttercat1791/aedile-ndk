@@ -4,6 +4,7 @@
 
 #include <noscrypt.h>
 #include <noscryptutil.h>
+#include "../internal/noscrypt_logger.hpp"
 
 namespace nostr
 {
@@ -31,28 +32,28 @@ public:
 
     NoscryptCipherContext(NoscryptCipherVersion version, NoscryptCipherMode mode)
     {
-    /*
-    * Create a new cipher context with the specified
-    * version and mode that will live for the duration of the
-    * instance.
-    *
-    * The user is expected to use the noscryptutil mode for
-    * setting encryption/decryption modes.
-    *
-    * The cipher will zero out the memory when it is freed.
-    *
-    * For decryption, by default the mac is verified before
-    * decryption occurs.
-    *
-    * NOTE: The ciper is set to reusable mode, so encrypt/decrypt
-    * can be called multiple times although it's not recommended,
-    * its just the more predictable way for users to handle it.
-    */
+        /*
+        * Create a new cipher context with the specified
+        * version and mode that will live for the duration of the
+        * instance.
+        *
+        * The user is expected to use the noscryptutil mode for
+        * setting encryption/decryption modes.
+        *
+        * The cipher will zero out the memory when it is freed.
+        *
+        * For decryption, by default the mac is verified before
+        * decryption occurs.
+        *
+        * NOTE: The ciper is set to reusable mode, so encrypt/decrypt
+        * can be called multiple times although it's not recommended,
+        * its just the more predictable way for users to handle it.
+        */
 
-    _cipher = NCUtilCipherAlloc(
-        (uint32_t)version,
-        ((uint32_t)mode) | NC_UTIL_CIPHER_ZERO_ON_FREE | NC_UTIL_CIPHER_REUSEABLE
-    );
+        _cipher = NCUtilCipherAlloc(
+            (uint32_t)version,
+            ((uint32_t)mode) | NC_UTIL_CIPHER_ZERO_ON_FREE | NC_UTIL_CIPHER_REUSEABLE
+        );
 
     //TODO, may fail to allocate memory.
     }

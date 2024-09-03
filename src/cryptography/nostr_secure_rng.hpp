@@ -29,6 +29,7 @@ public:
 	/*
 	* @brief Reseeds the RNG with random bytes from /dev/random.
 	* @param bufferSize The number of bytes to read from /dev/random.
+	* @remark Falls back to /dev/urandom if /dev/random is not available.
 	*/
 	static void reseed(uint32_t bufferSize = 32);
 

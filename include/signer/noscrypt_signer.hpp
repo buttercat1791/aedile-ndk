@@ -176,16 +176,6 @@ private:
     std::string _decryptNip44(const std::string input);
 
     #pragma endregion
-
-    #pragma region Logging
-
-    inline void _logNoscryptInitResult(NCResult initResult) const;
-
-    inline void _logNoscryptSecretValidationResult(NCResult secretValidationResult) const;
-
-    inline void _logNoscryptPubkeyGenerationResult(NCResult pubkeyGenerationResult) const;
-
-    #pragma endregion
 };
 } // namespace signer
 } // namespace nostr
