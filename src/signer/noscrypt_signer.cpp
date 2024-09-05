@@ -440,7 +440,7 @@ shared_ptr<Event> NoscryptSigner::_wrapSignerMessage(nlohmann::json jrpc)
     // TODO: Handle result codes.
     if (signatureResult != NC_SUCCESS)
     {
-		NC_LOG_ERROR(signatureResult);
+        NC_LOG_ERROR(signatureResult);
         return nullptr;
     }
 
