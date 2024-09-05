@@ -342,4 +342,16 @@ public:
     */
     virtual void sign(std::shared_ptr<Event> event) = 0;
 };
+
+class IBech32
+{
+    virtual void encode(char*, uint8_t*) = 0;
+    virtual void encode(char*, char*) = 0;
+    virtual void encode(std::string, std::string) = 0;
+    virtual void encode(std::string, std::vector<uint8_t>) = 0;
+
+    virtual void decode(char*) = 0;
+    virtual void decode(std::string) = 0;
+};
+
 } // namespace nostr
