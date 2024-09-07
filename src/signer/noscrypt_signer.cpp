@@ -21,22 +21,16 @@ using namespace nostr::cryptography;
 
 #pragma region Local Statics
 
-static void _ncFreeContext(NCContext* ctx)
-{
-    operator delete(ctx);
-}
-
 static shared_ptr<NCContext> ncAllocContext()
 {
-    /* Allocates a new unmanaged block that will 
-    * be freed manually with the above helper when the smart 
-    * pointer is destroyed
+    /* 
+	* Use the utilties library to allocate a new Noscrypt context. 
+    * Shared pointer will call free when smart pointer is destroyed 
     */
-    void* ctxMemory = operator new(NCGetContextStructSize());
 
     return shared_ptr<NCContext>(
-        static_cast<NCContext*>(ctxMemory), 
-        _ncFreeContext
+        NCUtilContextAlloc(),
+        &NCUtilContextFree
     );
 }
 
