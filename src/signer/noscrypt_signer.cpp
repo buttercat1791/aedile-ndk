@@ -2,23 +2,87 @@
 #include <chrono>
 #include <cstring>
 #include <memory>
-#include <random>
 #include <sstream>
 #include <tuple>
 
 #include <nlohmann/json.hpp>
-#include <openssl/err.h>
-#include <openssl/rand.h>
 #include <uuid_v4.h>
 
 #include "signer/noscrypt_signer.hpp"
-#include "noscrypt_cipher.hpp"
+#include "../cryptography/nostr_secure_rng.hpp"
+#include "../cryptography/noscrypt_cipher.hpp"
+#include "../internal/noscrypt_logger.hpp"
 
+using namespace std;
 using namespace nostr::data;
 using namespace nostr::service;
 using namespace nostr::signer;
 using namespace nostr::cryptography;
-using namespace std;
+
+#pragma region Local Statics
+
+static shared_ptr<NCContext> ncAllocContext()
+{
+    /* 
+	* Use the utilties library to allocate a new Noscrypt context. 
+    * Shared pointer will call free when smart pointer is destroyed 
+    */
+
+    return shared_ptr<NCContext>(
+        NCUtilContextAlloc(),
+        &NCUtilContextFree
+    );
+}
+
+static shared_ptr<NCContext> initNoscryptContext()
+{
+    //Use helper to allocate a dynamic sized shared pointer
+    auto ctx = ncAllocContext();
+
+    auto randomEntropy = make_unique<uint8_t>(NC_CONTEXT_ENTROPY_SIZE);
+    NostrSecureRng::fill(randomEntropy.get(), NC_CONTEXT_ENTROPY_SIZE);
+
+    NCResult initResult = NCInitContext(ctx.get(), randomEntropy.get());
+
+    NC_LOG_ERROR(initResult);
+
+    return ctx;
+};
+
+/**
+ * @brief Generates a private/public key pair for local use.
+ * @returns The generated keypair of the form `[privateKey, publicKey]`, or a pair of empty
+ * strings if the function failed.
+ * @remarks This keypair is intended for temporary use, and should not be saved or used outside
+ * of this class.
+ */
+static void createLocalKeypair(
+    const shared_ptr<const NCContext> ctx,
+    shared_ptr<NCSecretKey> secret,
+    shared_ptr<NCPublicKey> pubkey
+)
+{
+    // Loop attempts to generate a secret key until a valid key is produced.
+    // Limit the number of attempts to prevent resource exhaustion in the event of a failure.
+    NCResult secretValidationResult;
+    int loopCount = 0;
+    do
+    {
+        NostrSecureRng::fill(secret.get(), sizeof(NCSecretKey));
+
+        secretValidationResult = NCValidateSecretKey(ctx.get(), secret.get());
+
+    } while (secretValidationResult != NC_SUCCESS && ++loopCount < 64);
+
+    NC_LOG_ERROR(secretValidationResult);
+
+    // Use noscrypt to derive the public key from its private counterpart.
+    NCResult pubkeyGenerationResult = NCGetPublicKey(ctx.get(), secret.get(), pubkey.get());
+
+    NC_LOG_ERROR(pubkeyGenerationResult);
+};
+
+#pragma endregion
 
 #pragma region Constructors and Destructors
 
@@ -28,9 +92,13 @@ NoscryptSigner::NoscryptSigner(
 {
     plog::init(plog::debug, appender.get());
 
-    this->_reseedRandomNumberGenerator();
-    this->_initNoscryptContext();
-    this->_createLocalKeypair();
+    this->_noscryptContext = initNoscryptContext();
+
+    createLocalKeypair(
+        this->_noscryptContext, 
+        this->_localPrivateKey, 
+        this->_localPublicKey
+    );
 
     this->_nostrService = nostrService;
 };
@@ -258,67 +326,6 @@ inline void NoscryptSigner::_setRemotePublicKey(const string value)
 
 #pragma region Setup
 
-void NoscryptSigner::_initNoscryptContext()
-{
-    shared_ptr<NCContext> context;
-    auto contextStructSize = NCGetContextStructSize();
-    auto randomEntropy = make_unique<uint8_t>(contextStructSize);
-
-    random_device rd;
-    mt19937 gen(rd());
-    uniform_int_distribution<> dist(0, contextStructSize);
-    generate_n(randomEntropy.get(), contextStructSize, [&]() { return dist(gen); });
-
-    NCResult initResult = NCInitContext(context.get(), randomEntropy.get());
-    this->_logNoscryptInitResult(initResult);
-
-    this->_noscryptContext = move(context);
-};
-
-/**
- * @brief Generates a private/public key pair for local use.
- * @returns The generated keypair of the form `[privateKey, publicKey]`, or a pair of empty
- * strings if the function failed.
- * @remarks This keypair is intended for temporary use, and should not be saved or used outside
- * of this class.
- */
-void NoscryptSigner::_createLocalKeypair()
-{
-    string privateKey;
-    string publicKey;
-
-    // To generate a private key, all we need is a random 32-bit buffer.
-    auto secret = make_unique<NCSecretKey>();
-
-    // Loop attempts to generate a secret key until a valid key is produced.
-    // Limit the number of attempts to prevent resource exhaustion in the event of a failure.
-    NCResult secretValidationResult;
-    int loopCount = 0;
-    do
-    {
-        int rc = RAND_bytes(secret->key, sizeof(NCSecretKey));
-        if (rc != 1)
-        {
-            unsigned long err = ERR_get_error();
-            PLOG_ERROR << "OpenSSL error " << err << " occurred while generating a secret key.";
-        }
-
-        secretValidationResult = NCValidateSecretKey(this->_noscryptContext.get(), secret.get());
-    } while (secretValidationResult != NC_SUCCESS && ++loopCount < 64);
-
-    this->_logNoscryptSecretValidationResult(secretValidationResult);
-    this->_localPrivateKey = move(secret);
-
-    // Use noscrypt to derive the public key from its private counterpart.
-    auto pubkey = make_unique<NCPublicKey>();
-    NCResult pubkeyGenerationResult = NCGetPublicKey(
-        this->_noscryptContext.get(),
-        secret.get(),
-        pubkey.get());
-    this->_logNoscryptPubkeyGenerationResult(pubkeyGenerationResult);
-    this->_localPublicKey = move(pubkey);
-};
-
 int NoscryptSigner::_parseRemotePublicKey(string connectionToken)
 {
     int queryStart = connectionToken.find('?');
@@ -403,35 +410,39 @@ shared_ptr<Event> NoscryptSigner::_wrapSignerMessage(nlohmann::json jrpc)
     wrapperEvent->tags.push_back({ "p", this->_getRemotePublicKey() });
     wrapperEvent->content = encryptedContent;
 
-    // Generate a random seed for the signer.
-    auto random32 = make_shared<uint8_t>(32);
-    int code = RAND_bytes(random32.get(), 32);
-    if (code <= 0)
-    {
-        PLOG_ERROR << "Failed to generate a random 32-byte seed buffer for the signer.";
-        return nullptr;
-    }
+    uint8_t schnorrSig[64];
+	uint8_t random32[32];
+   
+    //Secure random signing entropy is required
+	NostrSecureRng::fill(random32, sizeof(random32));
 
     // Sign the wrapper message with the local secret key.
     string serializedEvent = wrapperEvent->serialize();
-    uint32_t dataSize = serializedEvent.length();
-    auto signature = make_unique<uint8_t>(64);
+
     NCResult signatureResult = NCSignData(
         this->_noscryptContext.get(),
         this->_localPrivateKey.get(),
-        random32.get(),
-        reinterpret_cast<uint8_t*>(serializedEvent.data()),
-        dataSize,
-        signature.get());
+        random32,
+        reinterpret_cast<const uint8_t*>(serializedEvent.c_str()),
+        serializedEvent.length(),
+        schnorrSig
+    );
+
+    //Random buffer could leak sensitive signing information
+    NostrSecureRng::zero(random32, sizeof(random32));
 
     // TODO: Handle result codes.
     if (signatureResult != NC_SUCCESS)
     {
+        NC_LOG_ERROR(signatureResult);
         return nullptr;
     }
 
     // Add the signature to the event.
-    wrapperEvent->sig = string((char*)signature.get(), 64);
+    wrapperEvent->sig = string(
+        reinterpret_cast<char*>(schnorrSig), 
+        sizeof(schnorrSig)
+    );
 
     return wrapperEvent;
 };
@@ -512,16 +523,6 @@ promise<bool> NoscryptSigner::_pingSigner()
 
 #pragma region Cryptography
 
-void NoscryptSigner::_reseedRandomNumberGenerator(uint32_t bufferSize)
-{
-    int rc = RAND_load_file("/dev/random", bufferSize);
-    if (rc != bufferSize)
-    {
-        PLOG_WARNING << "Failed to reseed the RNG with /dev/random, falling back to /dev/urandom.";
-        RAND_poll();
-    }
-};
-
 string NoscryptSigner::_encryptNip04(std::string input)
 {
     throw runtime_error("NIP-04 encryption is not yet implemented.");
@@ -534,7 +535,10 @@ string NoscryptSigner::_decryptNip04(string input)
 
 string NoscryptSigner::_encryptNip44(string input)
 {
-    NoscryptCipher cipher = NoscryptCipher(NC_ENC_VERSION_NIP44, NC_UTIL_CIPHER_MODE_ENCRYPT);
+    NoscryptCipher cipher = NoscryptCipher(
+        NoscryptCipherVersion::NIP44,
+        NoscryptCipherMode::CIPHER_MODE_ENCRYPT
+    );
 
 	auto output = cipher.update(
 		this->_noscryptContext,
@@ -552,7 +556,10 @@ string NoscryptSigner::_decryptNip44(string input)
 {
     //TODO handle input validation as per nip44 spec
 
-    NoscryptCipher cipher = NoscryptCipher(NC_ENC_VERSION_NIP44, NC_UTIL_CIPHER_MODE_DECRYPT);
+    NoscryptCipher cipher = NoscryptCipher(
+        NoscryptCipherVersion::NIP44, 
+        NoscryptCipherMode::CIPHER_MODE_DECRYPT
+    );
 
     return cipher.update(
         this->_noscryptContext,
@@ -564,77 +571,3 @@ string NoscryptSigner::_decryptNip44(string input)
 
 #pragma endregion
 
-#pragma region Logging
-
-inline void NoscryptSigner::_logNoscryptInitResult(NCResult initResult) const
-{
-    switch (NCParseErrorCode(initResult, NULL)) {
-    case NC_SUCCESS:
-        PLOG_INFO << "noscrypt - success";
-        break;
-    
-    case E_NULL_PTR:
-        PLOG_ERROR << "noscrypt - error: A null pointer was passed to the initializer.";
-        break;
-
-    case E_INVALID_ARG:
-        PLOG_ERROR << "noscrypt - error: An invalid argument was passed to the initializer.";
-        break;
-    
-    case E_INVALID_CONTEXT:
-        PLOG_ERROR << "noscrypt - error: The NCContext struct is in an invalid state.";
-        break;
-
-    case E_ARGUMENT_OUT_OF_RANGE:
-        PLOG_ERROR << "noscrypt - error: An initializer argument was outside the range of acceptable values.";
-        break;
-
-    case E_OPERATION_FAILED:
-        PLOG_ERROR << "noscrypt - error";
-        break;
-    }
-};
-
-inline void NoscryptSigner::_logNoscryptSecretValidationResult(NCResult secretValidationResult) const
-{
-    if (NCParseErrorCode(secretValidationResult, NULL) == NC_SUCCESS)
-    {
-        PLOG_INFO << "noscrypt_signer - success: Generated a valid secret key.";
-    }
-    else
-    {
-        PLOG_ERROR << "noscrypt_signer - error: Failed to generate a valid secret key.";
-    }
-};
-
-inline void NoscryptSigner::_logNoscryptPubkeyGenerationResult(NCResult pubkeyGenerationResult) const
-{
-
-    switch (NCParseErrorCode(pubkeyGenerationResult, NULL)) {
-    case NC_SUCCESS:
-        PLOG_INFO << "noscrypt - success: Generated a valid public key.";
-        break;
-    
-    case E_NULL_PTR:
-        PLOG_ERROR << "noscrypt - error: A null pointer was passed to the public key generation function.";
-        break;
-
-    case E_INVALID_ARG:
-        PLOG_ERROR << "noscrypt - error: An invalid argument was passed to the public key generation function.";
-        break;
-    
-    case E_INVALID_CONTEXT:
-        PLOG_ERROR << "noscrypt - error: The NCContext struct is in an invalid state.";
-        break;
-
-    case E_ARGUMENT_OUT_OF_RANGE:
-        PLOG_ERROR << "noscrypt - error: An argument was outside the range of acceptable values.";
-        break;
-
-    case E_OPERATION_FAILED:
-        PLOG_ERROR << "noscrypt - error: Failed to generate the public key from the secret key.";
-        break;
-    }
-};
-
-#pragma endregion

@@ -59,7 +59,7 @@ include_directories(${uuid_v4_SOURCE_DIR})
 FetchContent_Declare(
     libnoscrypt
     GIT_REPOSITORY git@github.com:VnUgE/noscrypt.git
-    GIT_TAG fb3608b9455b3e0956e401e6254da13cebd71558
+    GIT_TAG v0.1.5
 )
 FetchContent_MakeAvailable(libnoscrypt)
 
@@ -86,7 +86,6 @@ set(HEADERS
     ${INCLUDE_DIR}/nostr.hpp
     ${CLIENT_INCLUDE_DIR}/web_socket_client.hpp
     ${CLIENT_INCLUDE_DIR}/websocketpp_client.hpp
-    ${CRYPTOGRAPHY_INCLUDE_DIR}/noscrypt_cipher.hpp
     ${DATA_INCLUDE_DIR}/data.hpp
     ${SERVICE_INCLUDE_DIR}/nostr_service_base.hpp
     ${SIGNER_INCLUDE_DIR}/signer.hpp
@@ -102,6 +101,7 @@ set(SIGNER_SOURCE_DIR ./src/signer)
 set(SOURCES
     ${CLIENT_SOURCE_DIR}/websocketpp_client.cpp
     ${CRYPTOGRAPHY_SOURCE_DIR}/noscrypt_cipher.cpp
+    ${CRYPTOGRAPHY_SOURCE_DIR}/nostr_secure_rng.cpp
     ${DATA_SOURCE_DIR}/event.cpp
     ${DATA_SOURCE_DIR}/filters.cpp
     ${SERVICE_SOURCE_DIR}/nostr_service_base.cpp

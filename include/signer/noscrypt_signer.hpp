@@ -146,12 +146,6 @@ private:
     #pragma region Cryptography
 
     /**
-     * @brief Reseeds OpenSSL's pseudo-random number generator, using `/dev/random` as the seed, if
-     * possible.
-    */
-    void _reseedRandomNumberGenerator(uint32_t bufferSize = 32);
-
-    /**
      * @brief Encrypts a string according to the standard specified in NIP-04.
      * @param input The string to be encrypted.
      * @return The resulting encrypted string, or an empty string if the input could not be
@@ -180,16 +174,6 @@ private:
      * @return The decrypted string, or an empty string if the input could not be decrypted.
      */
     std::string _decryptNip44(const std::string input);
-
-    #pragma endregion
-
-    #pragma region Logging
-
-    inline void _logNoscryptInitResult(NCResult initResult) const;
-
-    inline void _logNoscryptSecretValidationResult(NCResult secretValidationResult) const;
-
-    inline void _logNoscryptPubkeyGenerationResult(NCResult pubkeyGenerationResult) const;
 
     #pragma endregion
 };

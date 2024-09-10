@@ -4,11 +4,25 @@
 
 #include <noscrypt.h>
 #include <noscryptutil.h>
+#include "../internal/noscrypt_logger.hpp"
 
 namespace nostr
 {
 namespace cryptography
 {
+
+enum NoscryptCipherMode : uint32_t
+{
+    CIPHER_MODE_ENCRYPT = NC_UTIL_CIPHER_MODE_ENCRYPT,
+    CIPHER_MODE_DECRYPT = NC_UTIL_CIPHER_MODE_DECRYPT,
+};
+  
+enum NoscryptCipherVersion : uint32_t
+{
+	NIP04 = NC_ENC_VERSION_NIP04,
+	NIP44 = NC_ENC_VERSION_NIP44,
+};
+
 class NoscryptCipherContext
 {
 private:
@@ -16,30 +30,30 @@ private:
 
 public:
 
-    NoscryptCipherContext(uint32_t version, uint32_t mode)
+    NoscryptCipherContext(NoscryptCipherVersion version, NoscryptCipherMode mode)
     {
-    /*
-    * Create a new cipher context with the specified
-    * version and mode that will live for the duration of the
-    * instance.
-    *
-    * The user is expected to use the noscryptutil mode for
-    * setting encryption/decryption modes.
-    *
-    * The cipher will zero out the memory when it is freed.
-    *
-    * For decryption, by default the mac is verified before
-    * decryption occurs.
-    *
-    * NOTE: The ciper is set to reusable mode, so encrypt/decrypt
-    * can be called multiple times although it's not recommended,
-    * its just the more predictable way for users to handle it.
-    */
+        /*
+        * Create a new cipher context with the specified
+        * version and mode that will live for the duration of the
+        * instance.
+        *
+        * The user is expected to use the noscryptutil mode for
+        * setting encryption/decryption modes.
+        *
+        * The cipher will zero out the memory when it is freed.
+        *
+        * For decryption, by default the mac is verified before
+        * decryption occurs.
+        *
+        * NOTE: The ciper is set to reusable mode, so encrypt/decrypt
+        * can be called multiple times although it's not recommended,
+        * its just the more predictable way for users to handle it.
+        */
 
-    _cipher = NCUtilCipherAlloc(
-        version,
-        mode | NC_UTIL_CIPHER_ZERO_ON_FREE | NC_UTIL_CIPHER_REUSEABLE
-    );
+        _cipher = NCUtilCipherAlloc(
+            (uint32_t)version,
+            ((uint32_t)mode) | NC_UTIL_CIPHER_ZERO_ON_FREE | NC_UTIL_CIPHER_REUSEABLE
+        );
 
     //TODO, may fail to allocate memory.
     }
@@ -95,6 +109,12 @@ public:
         return (uint32_t)result;
     }
 
+    NoscryptCipherMode mode() const
+    {
+		//Mode bit is lsb so just mask off the rest of the flags and convert back to enum
+		return (NoscryptCipherMode)(flags() & NC_UTIL_CIPHER_MODE);
+    }
+
     NCResult readOutput(std::vector<uint8_t>& output) const
     {
         return NCUtilCipherReadOutput(_cipher, output.data(), (uint32_t)output.size());
@@ -125,7 +145,7 @@ private:
     std::vector<uint8_t> _ivBuffer;
 
 public:
-    NoscryptCipher(uint32_t version, uint32_t mode);
+    NoscryptCipher(NoscryptCipherVersion version, NoscryptCipherMode mode);
 
     /*
      * @brief Performs the cipher operation on the input data. Depending on the mode
