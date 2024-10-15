@@ -124,4 +124,9 @@ install(EXPORT ${PROJECT_NAME}Targets
         NAMESPACE ${PROJECT_NAME}::
         DESTINATION lib/cmake/${PROJECT_NAME})
 
-add_subdirectory(test EXCLUDE_FROM_ALL)
+if(${ENABLE_TESTS})
+  enable_testing()
+  add_subdirectory(test)
+else()
+  add_subdirectory(test EXCLUDE_FROM_ALL)
+endif()
