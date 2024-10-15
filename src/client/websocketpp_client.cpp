@@ -1,4 +1,5 @@
 #include "web_socket_client.hpp"
+#include <unordered_map>
 
 using std::error_code;
 using std::function;

@@ -34,7 +34,7 @@ To build the SDK on Linux, run the following commands from the project root:
 
 ```bash
 export VCPKG_ROOT=/path/to/vcpkg/installation
-cmake --preset=linux # configuration step
+cmake --preset=linux -DENABLE_TESTS=1 # configuration step with tests enabled
 cmake --build build/linux # compilation or build step
 ```
 
