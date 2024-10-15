@@ -1,4 +1,3 @@
-<<<<<<< HEAD
 # Aedile
 
 A Nostr System Development Kit written in C++.
