@@ -24,7 +24,10 @@ public:
 	* @brief Fills the given vector with secure random bytes.
 	* @param buffer The vector to fill with random bytes.
     */
-    static inline void fill(std::vector<uint8_t>& buffer);
+    static inline void fill(std::vector<uint8_t>& buffer)
+    {
+        fill(buffer.data(), buffer.size());
+    }
 
     /*
      * @brief Reseeds the RNG with random bytes from /dev/random.
