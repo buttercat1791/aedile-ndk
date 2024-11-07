@@ -19,11 +19,6 @@ void NostrSecureRng::fill(void* buffer, size_t length)
 	}
 }
 
-inline void NostrSecureRng::fill(vector<uint8_t>& buffer)
-{
-	fill(buffer.data(), buffer.size());
-}
-
 void NostrSecureRng::reseed(uint32_t bufferSize)
 {
 	int rc = RAND_load_file("/dev/random", bufferSize);
