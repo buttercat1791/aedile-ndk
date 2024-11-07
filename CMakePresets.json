@@ -6,6 +6,7 @@
         "generator": "Unix Makefiles",
         "binaryDir": "${sourceDir}/build/linux",
         "cacheVariables": {
+          "AEDILE_INCLUDE_TESTS": "OFF",
           "CMAKE_BUILD_TYPE": "Release",
           "CMAKE_TOOLCHAIN_FILE": "${sourceDir}/vcpkg/scripts/buildsystems/vcpkg.cmake",
           "VCPKG_MANIFEST_MODE": "ON",
