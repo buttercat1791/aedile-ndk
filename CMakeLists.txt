@@ -88,6 +88,7 @@ set(HEADERS
     ${CLIENT_INCLUDE_DIR}/websocketpp_client.hpp
     ${DATA_INCLUDE_DIR}/data.hpp
     ${SERVICE_INCLUDE_DIR}/nostr_service_base.hpp
+    ${SERVICE_INCLUDE_DIR}/nostr_service.hpp
     ${SIGNER_INCLUDE_DIR}/signer.hpp
     ${SIGNER_INCLUDE_DIR}/noscrypt_signer.hpp
 )
@@ -105,6 +106,7 @@ set(SOURCES
     ${DATA_SOURCE_DIR}/event.cpp
     ${DATA_SOURCE_DIR}/filters.cpp
     ${SERVICE_SOURCE_DIR}/nostr_service_base.cpp
+    ${SERVICE_SOURCE_DIR}/nostr_service.cpp
     ${SIGNER_SOURCE_DIR}/noscrypt_signer.cpp
 )
 
