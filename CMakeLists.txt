@@ -106,7 +106,7 @@ set(SOURCES
     ${DATA_SOURCE_DIR}/event.cpp
     ${DATA_SOURCE_DIR}/filters.cpp
     ${SERVICE_SOURCE_DIR}/nostr_service_base.cpp
-    ${SERVICE_SOURCE_DIR}/nostr_service.cpp
+    ${SERVICE_SOURCE_DIR}/console_websocketpp_noscrypt.cpp
     ${SIGNER_SOURCE_DIR}/noscrypt_signer.cpp
 )
 
