@@ -74,19 +74,25 @@ set(INCLUDE_DIR ./include)
 set(CLIENT_INCLUDE_DIR ./include/client)
 set(CRYPTOGRAPHY_INCLUDE_DIR ./include/cryptography)
 set(DATA_INCLUDE_DIR ./include/data)
+set(INTERNAL_INCLUDE_DIR ./include/internal)
 set(SERVICE_INCLUDE_DIR ./include/service)
 set(SIGNER_INCLUDE_DIR ./include/signer)
 include_directories(${INCLUDE_DIR})
 include_directories(${CLIENT_INCLUDE_DIR})
 include_directories(${CRYPTOGRAPHY_INCLUDE_DIR})
 include_directories(${DATA_INCLUDE_DIR})
+include_directories(${INTERNAL_INCLUDE_DIR})
+include_directories(${SERVICE_INCLUDE_DIR})
 include_directories(${SIGNER_INCLUDE_DIR})
 
 set(HEADERS
     ${INCLUDE_DIR}/nostr.hpp
     ${CLIENT_INCLUDE_DIR}/web_socket_client.hpp
     ${CLIENT_INCLUDE_DIR}/websocketpp_client.hpp
+    ${CRYPTOGRAPHY_INCLUDE_DIR}/noscrypt_cipher.hpp
+    ${CRYPTOGRAPHY_INCLUDE_DIR}/nostr_secure_rng.hpp
     ${DATA_INCLUDE_DIR}/data.hpp
+    ${INTERNAL_INCLUDE_DIR}/noscrypt_logger.hpp
     ${SERVICE_INCLUDE_DIR}/nostr_service_base.hpp
     ${SERVICE_INCLUDE_DIR}/nostr_service.hpp
     ${SIGNER_INCLUDE_DIR}/signer.hpp

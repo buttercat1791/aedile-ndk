@@ -4,7 +4,8 @@
 
 #include <noscrypt.h>
 #include <noscryptutil.h>
-#include "../internal/noscrypt_logger.hpp"
+
+#include "internal/noscrypt_logger.hpp"
 
 namespace nostr
 {

@@ -3,8 +3,8 @@
 
 #include <openssl/evp.h>
 
-#include "nostr_secure_rng.hpp"
-#include "noscrypt_cipher.hpp"
+#include "cryptography/nostr_secure_rng.hpp"
+#include "cryptography/noscrypt_cipher.hpp"
 #include "../internal/noscrypt_logger.hpp"
 
 using namespace std;
