@@ -5,7 +5,7 @@
 #include <openssl/rand.h>
 #include <openssl/crypto.h>
 
-#include "cryptography/nostr_secure_rng.hpp"
+#include "nostr_secure_rng.hpp"
 
 using namespace std;
 using namespace nostr::cryptography;
