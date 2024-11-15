@@ -64,7 +64,8 @@ public:
         std::vector<std::string> relays,
         std::string name,
         std::string url,
-        std::string description) = 0;
+        std::string description
+    ) = 0;
 };
 } // namespace signer
 } // namespace nostr

@@ -16,7 +16,8 @@ class NoscryptSigner : public INostrConnectSigner
 public:
     NoscryptSigner(
         std::shared_ptr<plog::IAppender> appender,
-        std::shared_ptr<nostr::service::INostrServiceBase> nostrService);
+        std::shared_ptr<nostr::service::INostrServiceBase> nostrService
+    );
 
     ~NoscryptSigner();
 
@@ -26,7 +27,8 @@ public:
         std::vector<std::string> relays,
         std::string name,
         std::string url,
-        std::string description) override;
+        std::string description
+    ) override;
 
     std::shared_ptr<std::promise<bool>> sign(std::shared_ptr<data::Event> event) override;
 
