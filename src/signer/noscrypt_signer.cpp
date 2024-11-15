@@ -88,7 +88,8 @@ static void createLocalKeypair(
 
 NoscryptSigner::NoscryptSigner(
     shared_ptr<plog::IAppender> appender,
-    shared_ptr<INostrServiceBase> nostrService)
+    shared_ptr<INostrServiceBase> nostrService
+)
 {
     plog::init(plog::debug, appender.get());
 
@@ -144,7 +145,8 @@ string NoscryptSigner::initiateConnection(
     vector<string> relays,
     string name,
     string url,
-    string description)
+    string description
+)
 {
     // Return an empty string if the local keypair is invalid.
     if (this->_getLocalPrivateKey().empty() || this->_getLocalPublicKey().empty())
@@ -232,7 +234,8 @@ shared_ptr<promise<bool>> NoscryptSigner::sign(shared_ptr<Event> event)
         [&signingPromise](const string&, const string&)
         {
             signingPromise->set_value(false);
-        });
+        }
+    );
     
     return signingPromise;
 };

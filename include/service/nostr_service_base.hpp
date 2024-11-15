@@ -53,7 +53,8 @@ public:
      * to publish.
      */
     virtual std::tuple<std::vector<std::string>, std::vector<std::string>> publishEvent(
-        std::shared_ptr<data::Event> event) = 0;
+        std::shared_ptr<data::Event> event
+    ) = 0;
 
     /**
      * @brief Queries all open relay connections for events matching the given set of filters, and
@@ -69,7 +70,8 @@ public:
      * defaulted to 16.
      */
     virtual std::future<std::vector<std::shared_ptr<data::Event>>> queryRelays(
-        std::shared_ptr<data::Filters> filters) = 0;
+        std::shared_ptr<data::Filters> filters
+    ) = 0;
 
     /**
      * @brief Queries all open relay connections for events matching the given set of filters.
@@ -89,7 +91,8 @@ public:
         std::shared_ptr<data::Filters> filters,
         std::function<void(const std::string&, std::shared_ptr<data::Event>)> eventHandler,
         std::function<void(const std::string&)> eoseHandler,
-        std::function<void(const std::string&, const std::string&)> closeHandler) = 0;
+        std::function<void(const std::string&, const std::string&)> closeHandler
+    ) = 0;
     
     /**
      * @brief Closes the subscription with the given ID on all open relay connections.
@@ -98,7 +101,8 @@ public:
      * message.
      */
     virtual std::tuple<std::vector<std::string>, std::vector<std::string>> closeSubscription(
-        std::string subscriptionId) = 0;
+        std::string subscriptionId
+    ) = 0;
 
     /**
      * @brief Closes the subscription with the given ID on the given relay.
@@ -120,12 +124,14 @@ class NostrServiceBase : public INostrServiceBase
 public:
     NostrServiceBase(
         std::shared_ptr<plog::IAppender> appender,
-        std::shared_ptr<client::IWebSocketClient> client);
+        std::shared_ptr<client::IWebSocketClient> client
+    );
 
     NostrServiceBase(
         std::shared_ptr<plog::IAppender> appender,
         std::shared_ptr<client::IWebSocketClient> client,
-        std::vector<std::string> relays);
+        std::vector<std::string> relays
+    );
 
     ~NostrServiceBase() override;
 
@@ -155,10 +161,12 @@ public:
         std::shared_ptr<data::Filters> filters,
         std::function<void(const std::string&, std::shared_ptr<data::Event>)> eventHandler,
         std::function<void(const std::string&)> eoseHandler,
-        std::function<void(const std::string&, const std::string&)> closeHandler) override;
+        std::function<void(const std::string&, const std::string&)> closeHandler
+    ) override;
 
     std::tuple<std::vector<std::string>, std::vector<std::string>> closeSubscription(
-        std::string subscriptionId) override;
+        std::string subscriptionId
+    ) override;
 
     bool closeSubscription(std::string subscriptionId, std::string relay) override;
 
@@ -207,7 +215,8 @@ private:
         std::string message,
         std::function<void(const std::string&, std::shared_ptr<data::Event>)> eventHandler,
         std::function<void(const std::string&)> eoseHandler,
-        std::function<void(const std::string&, const std::string&)> closeHandler);
+        std::function<void(const std::string&, const std::string&)> closeHandler
+    );
 
     void _onAcceptance(std::string message, std::function<void(const bool)> acceptanceHandler);
 };

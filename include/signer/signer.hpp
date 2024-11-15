@@ -32,7 +32,9 @@ public:
      * fulfilled with `true` if the signing succeeded, and `false` if it failed.
      * @remark The event's `sig` field will be updated in-place with the signature.
      */
-    virtual std::shared_ptr<std::promise<bool>> sign(std::shared_ptr<nostr::data::Event> event) = 0;
+    virtual std::shared_ptr<std::promise<bool>> sign(
+        std::shared_ptr<nostr::data::Event> event
+    ) = 0;
 };
 
 class INostrConnectSigner : public ISigner

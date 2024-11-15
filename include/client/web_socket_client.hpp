@@ -57,7 +57,8 @@ public:
     virtual std::tuple<std::string, bool> send(
         std::string message,
         std::string uri,
-        std::function<void(const std::string&)> messageHandler) = 0;
+        std::function<void(const std::string&)> messageHandler
+    ) = 0;
 
     /**
      * @brief Sets up a message handler for the given server.
@@ -65,7 +66,10 @@ public:
      * @param messageHandler A callable object that will be invoked with the payload the client
      * receives from the server.
      */
-    virtual void receive(std::string uri, std::function<void(const std::string&)> messageHandler) = 0;
+    virtual void receive(
+        std::string uri,
+        std::function<void(const std::string&)> messageHandler
+    ) = 0;
 
     /**
      * @brief Closes the connection to the given server.

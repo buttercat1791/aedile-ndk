@@ -71,7 +71,8 @@ tuple<string, bool> WebsocketppClient::send(string message, string uri)
 tuple<string, bool> WebsocketppClient::send(
     string message,
     string uri,
-    function<void(const string&)> messageHandler)
+    function<void(const string&)> messageHandler
+)
 {
     auto successes = this->send(message, uri);
     this->receive(uri, messageHandler);
@@ -80,18 +81,22 @@ tuple<string, bool> WebsocketppClient::send(
 
 void WebsocketppClient::receive(
     string uri,
-    function<void(const string&)> messageHandler)
+    function<void(const string&)> messageHandler
+)
 {
     lock_guard<mutex> lock(this->_propertyMutex);
     auto connectionHandle = this->_connectionHandles[uri];
     auto connection = this->_client.get_con_from_hdl(connectionHandle);
 
-    connection->set_message_handler([messageHandler](
-        websocketpp::connection_hdl connectionHandle,
-        websocketpp_client::message_ptr message)
-    {
-        messageHandler(message->get_payload());
-    });
+    connection->set_message_handler(
+        [messageHandler](
+            websocketpp::connection_hdl connectionHandle,
+            websocketpp_client::message_ptr message
+        )
+        {
+            messageHandler(message->get_payload());
+        }
+    );
 };
 
 void WebsocketppClient::closeConnection(string uri)
@@ -102,7 +107,8 @@ void WebsocketppClient::closeConnection(string uri)
     this->_client.close(
         handle,
         websocketpp::close::status::going_away,
-        "_client requested close.");
+        "_client requested close."
+    );
     
     this->_connectionHandles.erase(uri);
 };

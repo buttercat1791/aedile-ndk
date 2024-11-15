@@ -32,7 +32,8 @@ public:
     std::tuple<std::string, bool> send(
         std::string message,
         std::string uri,
-        std::function<void(const std::string&)> messageHandler) override;
+        std::function<void(const std::string&)> messageHandler
+    ) override;
 
     void receive(std::string uri, std::function<void(const std::string&)> messageHandler) override;
 

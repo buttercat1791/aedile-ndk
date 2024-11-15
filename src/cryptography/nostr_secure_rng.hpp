@@ -14,16 +14,16 @@ private:
 public:
 
     /**
-	* @brief Fills the given buffer with secure random bytes.
-	* @param buffer The buffer to fill with random bytes.
-	* @param length The number of bytes to fill.
-    */
+     * @brief Fills the given buffer with secure random bytes.
+     * @param buffer The buffer to fill with random bytes.
+     * @param length The number of bytes to fill.
+     */
     static void fill(void* buffer, size_t length);
 
     /*
-	* @brief Fills the given vector with secure random bytes.
-	* @param buffer The vector to fill with random bytes.
-    */
+     * @brief Fills the given vector with secure random bytes.
+     * @param buffer The vector to fill with random bytes.
+     */
     static inline void fill(std::vector<uint8_t>& buffer)
     {
         fill(buffer.data(), buffer.size());

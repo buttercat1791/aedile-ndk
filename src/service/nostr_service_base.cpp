@@ -14,14 +14,14 @@ using namespace std;
 
 NostrServiceBase::NostrServiceBase(
     shared_ptr<plog::IAppender> appender,
-    shared_ptr<client::IWebSocketClient> client)
-: NostrServiceBase(appender, client, {}) { };
+    shared_ptr<client::IWebSocketClient> client
+) : NostrServiceBase(appender, client, {}) { };
 
 NostrServiceBase::NostrServiceBase(
     shared_ptr<plog::IAppender> appender,
     shared_ptr<client::IWebSocketClient> client,
-    vector<string> relays)
-: _defaultRelays(relays), _client(client)
+    vector<string> relays
+) : _defaultRelays(relays), _client(client)
 {
     plog::init(plog::debug, appender.get());
     client->start();
@@ -110,7 +110,8 @@ void NostrServiceBase::closeRelayConnections(vector<string> relays)
 
 // TODO: Make this method return a promise.
 tuple<vector<string>, vector<string>> NostrServiceBase::publishEvent(
-    shared_ptr<nostr::data::Event> event)
+    shared_ptr<nostr::data::Event> event
+)
 {
     vector<string> successfulRelays;
     vector<string> failedRelays;
@@ -146,19 +147,22 @@ tuple<vector<string>, vector<string>> NostrServiceBase::publishEvent(
             relay,
             [this, &relay, &event, &publishPromise](string response)
             {
-                this->_onAcceptance(response, [this, &relay, &event, &publishPromise](bool isAccepted)
-                {
-                    if (isAccepted)
+                this->_onAcceptance(
+                    response,
+                    [this, &relay, &event, &publishPromise](bool isAccepted)
                     {
-                        PLOG_INFO << "Relay " << relay << " accepted event: " << event->id;
-                        publishPromise.set_value(make_tuple(relay, true));
+                        if (isAccepted)
+                        {
+                            PLOG_INFO << "Relay " << relay << " accepted event: " << event->id;
+                            publishPromise.set_value(make_tuple(relay, true));
+                        }
+                        else
+                        {
+                            PLOG_WARNING << "Relay " << relay << " rejected event: " << event->id;
+                            publishPromise.set_value(make_tuple(relay, false));
+                        }
                     }
-                    else
-                    {
-                        PLOG_WARNING << "Relay " << relay << " rejected event: " << event->id;
-                        publishPromise.set_value(make_tuple(relay, false));
-                    }
-                });
+                );
             });
 
         if (!success)
@@ -256,7 +260,8 @@ future<vector<shared_ptr<nostr::data::Event>>> NostrServiceBase::queryRelays(
                         {
                             eosePromise.set_value(make_tuple(relay, false));
                         });
-                });
+                }
+            );
 
             if (success)
             {
@@ -297,7 +302,8 @@ string NostrServiceBase::queryRelays(
     shared_ptr<nostr::data::Filters> filters,
     function<void(const string&, shared_ptr<nostr::data::Event>)> eventHandler,
     function<void(const string&)> eoseHandler,
-    function<void(const string&, const string&)> closeHandler)
+    function<void(const string&, const string&)> closeHandler
+)
 {
     vector<string> successfulRelays;
     vector<string> failedRelays;
@@ -321,7 +327,8 @@ string NostrServiceBase::queryRelays(
                     {
                         this->_onSubscriptionMessage(payload, eventHandler, eoseHandler, closeHandler);
                     });
-            });
+            }
+        );
         requestFutures.push_back(move(requestFuture));
     }
 
@@ -614,7 +621,8 @@ void NostrServiceBase::_onSubscriptionMessage(
     string message,
     function<void(const string&, shared_ptr<nostr::data::Event>)> eventHandler,
     function<void(const string&)> eoseHandler,
-    function<void(const string&, const string&)> closeHandler)
+    function<void(const string&, const string&)> closeHandler
+)
 {
     try
     {
@@ -657,7 +665,8 @@ void NostrServiceBase::_onSubscriptionMessage(
 
 void NostrServiceBase::_onAcceptance(
     string message,
-    function<void(const bool)> acceptanceHandler)
+    function<void(const bool)> acceptanceHandler
+)
 {
     try
     {
