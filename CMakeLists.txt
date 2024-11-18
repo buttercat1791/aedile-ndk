@@ -56,61 +56,44 @@ FetchContent_GetProperties(uuid_v4)
 include_directories(${uuid_v4_SOURCE_DIR})
 
 #======== Configure noscrypt ========#
+set(CRYPTO_LIB openssl)
+set(NC_ENABLE_UTILS ON)
+
 FetchContent_Declare(
     libnoscrypt
     GIT_REPOSITORY git@github.com:VnUgE/noscrypt.git
     GIT_TAG v0.1.5
 )
 FetchContent_MakeAvailable(libnoscrypt)
-
 FetchContent_GetProperties(libnoscrypt)
-include_directories(${libnoscrypt_SOURCE_DIR}/include)
-
-set_target_properties(noscrypt PROPERTIES CRYPTO_LIB openssl)
-set_target_properties(noscrypt PROPERTIES NC_ENABLE_UTILS ON)   #utilities library is required
 
 #======== Build the project ========#
-set(INCLUDE_DIR ./include)
-set(CLIENT_INCLUDE_DIR ./include/client)
-set(CRYPTOGRAPHY_INCLUDE_DIR ./include/cryptography)
-set(DATA_INCLUDE_DIR ./include/data)
-set(SERVICE_INCLUDE_DIR ./include/service)
-set(SIGNER_INCLUDE_DIR ./include/signer)
-include_directories(${INCLUDE_DIR})
-include_directories(${CLIENT_INCLUDE_DIR})
-include_directories(${CRYPTOGRAPHY_INCLUDE_DIR})
-include_directories(${DATA_INCLUDE_DIR})
-include_directories(${SIGNER_INCLUDE_DIR})
-
-set(HEADERS
-    ${INCLUDE_DIR}/nostr.hpp
-    ${CLIENT_INCLUDE_DIR}/web_socket_client.hpp
-    ${CLIENT_INCLUDE_DIR}/websocketpp_client.hpp
-    ${DATA_INCLUDE_DIR}/data.hpp
-    ${SERVICE_INCLUDE_DIR}/nostr_service_base.hpp
-    ${SERVICE_INCLUDE_DIR}/nostr_service.hpp
-    ${SIGNER_INCLUDE_DIR}/signer.hpp
-    ${SIGNER_INCLUDE_DIR}/noscrypt_signer.hpp
+set(AEDILE_HEADERS
+    "include/nostr.hpp"
+    "include/client/web_socket_client.hpp"
+    "include/client/websocketpp_client.hpp"
+    "include/data/data.hpp"
+    "include/service/nostr_service_base.hpp"
+    "include/service/nostr_service.hpp"
+    "include/service/nostr_service_specializations.hpp"
+    "include/signer/signer.hpp"
+    "include/signer/noscrypt_signer.hpp"
+    "src/cryptography/noscrypt_cipher.hpp"
+    "src/cryptography/nostr_secure_rng.hpp"
+    "src/internal/noscrypt_logger.hpp"
 )
 
-set(SOURCE_DIR ./src)
-set(CLIENT_SOURCE_DIR ./src/client)
-set(CRYPTOGRAPHY_SOURCE_DIR ./src/cryptography)
-set(DATA_SOURCE_DIR ./src/data)
-set(SERVICE_SOURCE_DIR ./src/service)
-set(SIGNER_SOURCE_DIR ./src/signer)
-set(SOURCES
-    ${CLIENT_SOURCE_DIR}/websocketpp_client.cpp
-    ${CRYPTOGRAPHY_SOURCE_DIR}/noscrypt_cipher.cpp
-    ${CRYPTOGRAPHY_SOURCE_DIR}/nostr_secure_rng.cpp
-    ${DATA_SOURCE_DIR}/event.cpp
-    ${DATA_SOURCE_DIR}/filters.cpp
-    ${SERVICE_SOURCE_DIR}/nostr_service_base.cpp
-    ${SERVICE_SOURCE_DIR}/console_websocketpp_noscrypt.cpp
-    ${SIGNER_SOURCE_DIR}/noscrypt_signer.cpp
+set(AEDILE_SOURCES
+    "src/client/websocketpp_client.cpp"
+    "src/cryptography/noscrypt_cipher.cpp"
+    "src/cryptography/nostr_secure_rng.cpp"
+    "src/data/event.cpp"
+    "src/data/filters.cpp"
+    "src/service/nostr_service_base.cpp"
+    "src/signer/noscrypt_signer.cpp"
 )
 
-add_library(aedile ${SOURCES})
+add_library(aedile ${AEDILE_SOURCES} ${AEDILE_HEADERS})
 target_link_libraries(aedile PRIVATE
     nlohmann_json::nlohmann_json
     OpenSSL::SSL
@@ -119,7 +102,8 @@ target_link_libraries(aedile PRIVATE
     websocketpp::websocketpp
     noscrypt
 )
-target_include_directories(aedile PUBLIC ${INCLUDE_DIR})
+target_include_directories(aedile PRIVATE include)
+target_include_directories(aedile PRIVATE ${libnoscrypt_SOURCE_DIR}/include)
 set_target_properties(aedile PROPERTIES WINDOWS_EXPORT_ALL_SYMBOLS YES)
 
 #======== Build the tests ========#
@@ -141,18 +125,21 @@ if(AEDILE_INCLUDE_TESTS)
 
     set(TEST_DIR ./test)
     set(TEST_SOURCES
-        ${TEST_DIR}/nostr_service_base_test.cpp
+        # ${TEST_DIR}/nostr_event_test.cpp
+        "test/nostr_service_base_test.cpp"
     )
 
-    add_executable(aedile_test ${TEST_SOURCES} ${HEADERS})
+    add_executable(aedile_test ${TEST_SOURCES})
     target_link_libraries(aedile_test PRIVATE
         GTest::gmock
         GTest::gtest
         GTest::gtest_main
-        plog::plog
-        websocketpp::websocketpp
         aedile
+        nlohmann_json::nlohmann_json
     )
+    target_include_directories(aedile_test PRIVATE include)
+    target_include_directories(aedile_test PRIVATE src)
+    target_include_directories(aedile_test PRIVATE ${libnoscrypt_SOURCE_DIR}/include)
     set_target_properties(aedile_test PROPERTIES WINDOWS_EXPORT_ALL_SYMBOLS YES)
 
     gtest_add_tests(TARGET aedile_test)
