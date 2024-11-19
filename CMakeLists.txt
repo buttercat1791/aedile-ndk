@@ -125,7 +125,7 @@ if(AEDILE_INCLUDE_TESTS)
 
     set(TEST_DIR ./test)
     set(TEST_SOURCES
-        # ${TEST_DIR}/nostr_event_test.cpp
+        "test/nostr_event_test.cpp"
         "test/nostr_service_base_test.cpp"
     )
 
