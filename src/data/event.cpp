@@ -7,7 +7,6 @@ using namespace nlohmann;
 using namespace nostr::data;
 using namespace std;
 
-// TODO: Verify event signature using noscrypt.
 string Event::serialize()
 {
     try
@@ -19,17 +18,10 @@ string Event::serialize()
         throw e;
     }
 
-    json j = {
-        { "pubkey", this->pubkey },
-        { "created_at", this->createdAt },
-        { "kind", this->kind },
-        { "tags", this->tags },
-        { "content", this->content },
-        { "sig", this->sig }
-    };
+    // Generate the event ID from the serialized data.
+    this->generateId();
 
-    j["id"] = this->generateId(j.dump());
-
+    json j = *this;
     return j.dump();
 };
 
@@ -52,22 +44,7 @@ Event Event::fromString(string jstr)
 
 Event Event::fromJson(json j)
 {
-    Event event;
-
-    try {
-        event.id = j.at("id");
-        event.pubkey = j.at("pubkey");
-        event.createdAt = j.at("created_at");
-        event.kind = j.at("kind");
-        event.tags = j.at("tags");
-        event.content = j.at("content");
-        event.sig = j.at("sig");
-    } catch (const json::out_of_range& e) {
-        ostringstream oss;
-        oss << "Event::fromJson: Tried to access an out-of-range element: " << e.what();
-        throw invalid_argument(oss.str());
-    }
-
+    Event event = j.get<Event>();
     return event;
 };
 
@@ -76,7 +53,7 @@ void Event::validate()
     bool hasPubkey = this->pubkey.length() > 0;
     if (!hasPubkey)
     {
-        throw std::invalid_argument("Event::validate: The pubkey of the event author is required.");
+        throw invalid_argument("Event::validate: The pubkey of the event author is required.");
     }
 
     bool hasCreatedAt = this->createdAt > 0;
@@ -92,8 +69,12 @@ void Event::validate()
     }
 };
 
-string Event::generateId(string serializedData) const
+void Event::generateId()
 {
+    // Create a JSON array of values used to generate the event ID.
+    json arr = { 0, this->pubkey, this->createdAt, this->kind, this->tags, this->content };
+    string serializedData = arr.dump();
+
     unsigned char hash[SHA256_DIGEST_LENGTH];
     EVP_Digest(serializedData.c_str(), serializedData.length(), hash, NULL, EVP_sha256(), NULL);
 
@@ -103,7 +84,7 @@ string Event::generateId(string serializedData) const
         ss << hex << setw(2) << setfill('0') << (int)hash[i];
     }
 
-    return ss.str();
+    this->id = ss.str();
 };
 
 bool Event::operator==(const Event& other) const
@@ -119,3 +100,42 @@ bool Event::operator==(const Event& other) const
 
     return this->id == other.id;
 };
+
+void adl_serializer<Event>::to_json(json& j, const Event& event)
+{
+    // Serialize the event to a JSON object.
+    j = {
+        { "id", event.id },
+        { "pubkey", event.pubkey },
+        { "created_at", event.createdAt },
+        { "kind", event.kind },
+        { "tags", event.tags },
+        { "content", event.content },
+        { "sig", event.sig },
+    };
+}
+
+void adl_serializer<Event>::from_json(const json& j, Event& event)
+{
+    // TODO: Set up custom exception types for improved exception handling.
+    try
+    {
+        event.id = j.at("id");
+        event.pubkey = j.at("pubkey");
+        event.createdAt = j.at("created_at");
+        event.kind = j.at("kind");
+        event.tags = j.at("tags");
+        event.content = j.at("content");
+        event.sig = j.at("sig");
+
+        // TODO: Validate the event against its signature.
+    }
+    catch (const json::type_error& te)
+    {
+        throw te;
+    }
+    catch (const json::out_of_range& oor)
+    {
+        throw oor;
+    }
+}

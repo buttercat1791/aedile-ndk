@@ -17,24 +17,7 @@ string Filters::serialize(string& subscriptionId)
         throw e;
     }
 
-    json j = {
-        { "ids", this->ids },
-        { "authors", this->authors },
-        { "kinds", this->kinds },
-        { "since", this->since },
-        { "until", this->until },
-        { "limit", this->limit }
-    };
-
-    for (auto& tag : this->tags)
-    {
-        stringstream ss;
-        ss << "#" << tag.first;
-        string tagname = ss.str();
-
-        j[tagname] = tag.second;
-    }
-
+    json j = *this;
     json jarr = json::array({ "REQ", subscriptionId, j });
 
     return jarr.dump();
@@ -66,3 +49,30 @@ void Filters::validate()
         throw invalid_argument("Filters::validate: At least one filter must be set.");
     }
 };
+
+void adl_serializer<Filters>::to_json(json& j, const Filters& filters)
+{
+    j = {
+        { "ids", filters.ids },
+        { "authors", filters.authors },
+        { "kinds", filters.kinds },
+        { "since", filters.since },
+        { "until", filters.until },
+        { "limit", filters.limit }
+    };
+
+    for (auto& tag : filters.tags)
+    {
+        string name = tag.first[0] == '#'
+            ? tag.first
+            : '#' + tag.first;
+
+        json values = json::array();
+        for (auto& value : tag.second)
+        {
+            values.push_back(value);
+        }
+
+        j[name] = values;
+    }
+}

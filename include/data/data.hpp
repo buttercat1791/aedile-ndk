@@ -67,13 +67,10 @@ private:
     void validate();
 
     /**
-     * @brief Generates an ID for the event.
-     * @param serializedData The serialized JSON string of all of the event data except the ID and
-     * the signature.
-     * @return A valid Nostr event ID.
+     * @brief Generates an ID for the event and assigns it to the event's `id` field.
      * @remark The ID is a 32-bytes lowercase hex-encoded sha256 of the serialized event data.
      */
-    std::string generateId(std::string serializedData) const;
+    void generateId();
 };
 
 /**
@@ -112,3 +109,19 @@ private:
 };
 } // namespace data
 } // namespace nostr
+
+namespace nlohmann
+{
+template <>
+struct adl_serializer<nostr::data::Event>
+{
+    static void to_json(json& j, const nostr::data::Event& event);
+    static void from_json(const json& j, nostr::data::Event& event);
+};
+
+template<>
+struct adl_serializer<nostr::data::Filters>
+{
+    static void to_json(json& j, const nostr::data::Filters& filters);
+};
+} // namespace nlohmann
