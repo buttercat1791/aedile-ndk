@@ -1,3 +1,4 @@
+#include <gmock/gmock.h>
 #include <gtest/gtest.h>
 
 #include "data/data.hpp"
@@ -42,5 +43,50 @@ TEST(NostrEventTest, Equivalent_Events_Have_Same_ID)
 
     // Verify that both hashes are equal
     ASSERT_EQ(id1, id2);
+}
+
+TEST(NostrEventTest, Special_Characters_Are_Escaped_When_Serialized)
+{
+    // Test backspace (0x08)
+    auto backspaceEvent = testEvent();
+    backspaceEvent->content = string("Hello") + char(0x08) + "World";
+    string serializedBackspace = backspaceEvent->serialize();
+    EXPECT_THAT(serializedBackspace, HasSubstr("\\b"));
+
+    // Test tab (0x09)
+    auto tabEvent = testEvent();
+    tabEvent->content = string("Hello") + char(0x09) + "World";
+    string serializedTab = tabEvent->serialize();
+    EXPECT_THAT(serializedTab, HasSubstr("\\t"));
+
+    // Test newline (0x0A)
+    auto newlineEvent = testEvent();
+    newlineEvent->content = string("Hello") + char(0x0A) + "World";
+    string serializedNewline = newlineEvent->serialize();
+    EXPECT_THAT(serializedNewline, HasSubstr("\\n"));
+
+    // Test form feed (0x0C)
+    auto formFeedEvent = testEvent();
+    formFeedEvent->content = string("Hello") + char(0x0C) + "World";
+    string serializedFormFeed = formFeedEvent->serialize();
+    EXPECT_THAT(serializedFormFeed, HasSubstr("\\f"));
+
+    // Test carriage return (0x0D)
+    auto crEvent = testEvent();
+    crEvent->content = string("Hello") + char(0x0D) + "World";
+    string serializedCr = crEvent->serialize();
+    EXPECT_THAT(serializedCr, HasSubstr("\\r"));
+
+    // Test double quote (0x22)
+    auto quoteEvent = testEvent();
+    quoteEvent->content = string("Hello") + char(0x22) + "World";
+    string serializedQuote = quoteEvent->serialize();
+    EXPECT_THAT(serializedQuote, HasSubstr("\\\""));
+
+    // Test backslash (0x5C)
+    auto backslashEvent = testEvent();
+    backslashEvent->content = string("Hello") + char(0x5C) + "World";
+    string serializedBackslash = backslashEvent->serialize();
+    EXPECT_THAT(serializedBackslash, HasSubstr("\\\\"));
 }
 
