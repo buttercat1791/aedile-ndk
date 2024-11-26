@@ -2,7 +2,7 @@
 
 ## NIP-46: Remote Signing
 
-1. Connection Handshake Initiated by the Remote Signer
+### 1. Connection Handshake Initiated by the Remote Signer
 
     GIVEN a remote signer connected to a relay
 
@@ -28,7 +28,7 @@
 
     AND the client establishes a subscription to the relay for kind 24133 events with a `p` tag containing the remote signer's pubkey and a `since` value equal to the time at which the client sent the event
 
-2. Connection Handshake Completed by the Remote Signer
+###2. Connection Handshake Completed by the Remote Signer
 
     GIVEN a remote signer connected to a relay
 
@@ -46,7 +46,7 @@
 
     AND the client shall verify that the decrypted content is a JSON object containting the field `result` whose value is `"ack"`
 
-3. Connection Handshake Initiated by the Client
+### 3. Connection Handshake Initiated by the Client
 
     GIVEN a client connected to a relay
 
@@ -58,7 +58,7 @@
 
     THEN the client creates a subscription to the specified relay for kind 24133 events with a `p` tag containing the client's pubkey and a `since` value equal to the time at which the client generated the connection string
 
-4. Client-Initiated Connection Handshake Completed by the Remote Signer
+### 4. Client-Initiated Connection Handshake Completed by the Remote Signer
 
     GIVEN a client connected to a relay
 

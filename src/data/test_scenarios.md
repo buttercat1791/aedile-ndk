@@ -2,7 +2,7 @@
 
 ## NIP-01: Nostr Event Format
 
-1. Idempotent ID Generation
+### 1. Idempotent ID Generation
 
     GIVEN 2 events with the same values for `pubkey`, `created_at`, `kind`, `tags`, and `content`
 
@@ -10,7 +10,7 @@
 
 THEN the IDs generated for both events are identical
 
-2. Escaping Special Characters in Content
+### 2. Escaping Special Characters in Content
 
     GIVEN the content field of an event contains any of the characters `\b`, `\t`, `\n`, `\f`, `\r`, `"`, or `\`
 
