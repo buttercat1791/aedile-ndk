@@ -747,8 +747,8 @@ TEST_F(NostrServiceBaseTest, QueryRelays_ReturnsEvents_UpToEOSE)
     auto filters = make_shared<nostr::data::Filters>(getKind0And1TestFilters());
     auto results = nostrService->queryRelays(filters).get();
 
-    // TODO: Check results size when the queryRelays method deduplicates results before returning.
-    // ASSERT_EQ(results.size(), testEvents.size());
+    // Check results size to ensure there are no duplicates.
+    ASSERT_EQ(results.size(), testEvents.size());
 
     // Check that the results contain the expected events.
     for (auto resultEvent : results)
