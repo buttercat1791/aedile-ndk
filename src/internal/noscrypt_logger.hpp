@@ -10,7 +10,7 @@
 */
 #define NC_LOG_ERROR(result) _printNoscryptError(result, __func__, __LINE__)
 
-static inline void _printNoscryptError(NCResult result, const std::string funcName, int lineNum)
+static void _printNoscryptError(NCResult result, const std::string funcName, int lineNum)
 {
     uint8_t argPosition;
 
