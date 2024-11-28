@@ -47,7 +47,7 @@ find_package(websocketpp CONFIG REQUIRED)
 
 FetchContent_Declare(
     uuid_v4
-    GIT_REPOSITORY git@github.com:crashoz/uuid_v4.git
+    GIT_REPOSITORY https://github.com/crashoz/uuid_v4.git
     GIT_TAG v1.0.0
 )
 FetchContent_Populate(uuid_v4)
@@ -61,7 +61,7 @@ set(NC_ENABLE_UTILS ON)
 
 FetchContent_Declare(
     libnoscrypt
-    GIT_REPOSITORY git@github.com:VnUgE/noscrypt.git
+    GIT_REPOSITORY https://github.com/VnUgE/noscrypt.git
     GIT_TAG v0.1.5
 )
 FetchContent_MakeAvailable(libnoscrypt)
