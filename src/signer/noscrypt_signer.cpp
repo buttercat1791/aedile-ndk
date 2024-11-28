@@ -62,17 +62,10 @@ static void createLocalKeypair(
     shared_ptr<NCPublicKey> pubkey
 )
 {
-    // Loop attempts to generate a secret key until a valid key is produced.
-    // Limit the number of attempts to prevent resource exhaustion in the event of a failure.
     NCResult secretValidationResult;
-    int loopCount = 0;
-    do
-    {
-        NostrSecureRng::fill(secret.get(), sizeof(NCSecretKey));
 
-        secretValidationResult = NCValidateSecretKey(ctx.get(), secret.get());
-
-    } while (secretValidationResult != NC_SUCCESS && ++loopCount < 64);
+    NostrSecureRng::fill(secret.get(), sizeof(NCSecretKey));
+    secretValidationResult = NCValidateSecretKey(ctx.get(), secret.get());
 
     NC_LOG_ERROR(secretValidationResult);
 
