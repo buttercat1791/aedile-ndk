@@ -74,19 +74,6 @@ private:
     #pragma region Setup
     
     /**
-     * @brief Initializes the noscrypt library context into the class's `context` property.
-     */
-    void _initNoscryptContext();
-
-    /**
-     * @brief Generates a private/public key pair for local use and sets it to the class's private
-     * properties.
-     * @remarks This keypair is intended for temporary use, and should not be saved or used outside
-     * of this class.
-     */
-    void _createLocalKeypair();
-
-    /**
      * @brief Parses the remote signer npub from a connection token provided by the signer.
      * @param connectionToken A connection token beginning with `bunker://`.
      * @returns The index of the first character of the connection token's query string, or -1 if
