@@ -230,13 +230,7 @@ shared_ptr<promise<bool>> NoscryptSigner::sign(shared_ptr<Event> event)
 {
     auto signingPromise = make_shared<promise<bool>>();
 
-    auto signerAvailable = this->ping().get_future();
-    if (signerAvailable.get() == false)
-    {
-        PLOG_ERROR << "Ping to the remote signer failed - the remote signer may be unavailable.";
-        signingPromise->set_value(false);
-        return signingPromise;
-    }
+    // TODO: Check latency with ping() to establish a reasonable timeout.
 
     // Create the JSON-RPC-like message content.
     auto params = nlohmann::json::array();
