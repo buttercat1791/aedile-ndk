@@ -89,6 +89,7 @@ set(AEDILE_SOURCES
     "src/cryptography/nostr_secure_rng.cpp"
     "src/data/event.cpp"
     "src/data/filters.cpp"
+    "src/internal/noscrypt_logger.cpp"
     "src/service/nostr_service_base.cpp"
     "src/signer/noscrypt_signer.cpp"
 )
