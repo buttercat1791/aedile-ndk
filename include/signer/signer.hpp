@@ -2,6 +2,7 @@
 
 #include <future>
 #include <memory>
+#include <optional>
 #include <string>
 #include <vector>
 
@@ -51,23 +52,36 @@ public:
      * connection token into a client application, which would then call this method to establish a
      * connection to the remote signer.
      */
-    virtual void receiveConnection(std::string connectionToken) = 0;
+    virtual void receiveConnectionToken(std::string connectionToken) = 0;
 
     /**
      * @brief Generates a connection token that a remote signer may use to establish a connection
      * to the client.
      * @param relays A list of one or more relays the client will use to communicate with the
      * remote signer.
+     * @param secret An arbitrary value that the remote signer must return when connecting to
+     * validate its identity to the client.
+     * @param name The name of the client application.
+     * @param url The canonical URL of the client application.
+     * @param description A description of the client application.
      * @returns A connection token string beginning with `nostrconnect://`, as specified by NIP-46,
      * that may be provided to a remote signer to establish a connection to the client.  Returns an
      * empty string if the connection token generation fails.
      */
-    virtual std::string initiateConnection(
+    virtual std::string generateConnectionToken(
         std::vector<std::string> relays,
-        std::string name,
-        std::string url,
-        std::string description
+        std::string secret,
+        std::optional<std::string> name,
+        std::optional<std::string> url,
+        std::optional<std::string> description
     ) = 0;
+
+    /**
+     * @brief Pings the remote signer to check if it is still connected.
+     * @returns A promise that will be fulfilled with `true` if the remote signer is connected, and
+     * `false` otherwise.
+     */
+    virtual std::promise<bool> ping() = 0;
 };
 } // namespace signer
 } // namespace nostr

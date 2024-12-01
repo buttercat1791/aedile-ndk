@@ -106,7 +106,7 @@ NoscryptSigner::~NoscryptSigner()
 
 #pragma region Public Interface
 
-void NoscryptSigner::receiveConnection(string connectionToken)
+void NoscryptSigner::receiveConnectionToken(string connectionToken)
 {
     if (connectionToken.empty())
     {
@@ -134,11 +134,12 @@ void NoscryptSigner::receiveConnection(string connectionToken)
     // TODO: Handle any messaging with the remote signer.
 };
 
-string NoscryptSigner::initiateConnection(
+string NoscryptSigner::generateConnectionToken(
     vector<string> relays,
-    string name,
-    string url,
-    string description
+    string secret,
+    optional<string> name,
+    optional<string> url,
+    optional<string> description
 )
 {
     // Return an empty string if the local keypair is invalid.
@@ -166,22 +167,70 @@ string NoscryptSigner::initiateConnection(
         ss << (i == 0 ? "?" : "&");
         ss << "relay=" << relays[i];
     }
-    ss << "&metadata={";
-    ss << "\"name\":\"" << name << "\",";
-    ss << "\"url\":\"" << url << "\",";
-    ss << "\"description\":\"" << description << "\"";
-    ss << "}";
+    ss << "&secret=" << secret;
+
+    if (name.has_value())
+    {
+        ss << "&name=" << name.value();
+    }
+
+    if (url.has_value())
+    {
+        ss << "&url=" << url.value();
+    }
+
+    if (description.has_value())
+    {
+        ss << "&description=" << description.value();
+    }
 
     return ss.str();
+};
 
-    // TODO: Handle any messaging with the remote signer.
+promise<bool> NoscryptSigner::ping()
+{
+    promise<bool> pingPromise;
+
+    // Generate a ping message and wrap it for the signer.
+    nlohmann::json jrpc =
+    {
+        { "id", this->_generateSignerRequestId() },
+        { "method", "ping" },
+        { "params", nlohmann::json::array() }
+    };
+    auto messageEvent = this->_wrapSignerMessage(jrpc);
+
+    // Generate a filter to receive the response.
+    auto pingFilter = this->_buildSignerMessageFilters();
+
+    this->_nostrService->publishEvent(messageEvent);
+
+    // TODO: Handle the relay response.
+    this->_nostrService->queryRelays(
+        pingFilter,
+        [this, &pingPromise](const string&, shared_ptr<Event> pongEvent)
+        {
+            // 
+            string pongMessage = this->_unwrapSignerMessage(pongEvent);
+            pingPromise.set_value(pongMessage == "pong");
+        },
+        [&pingPromise](const string&)
+        {
+            pingPromise.set_value(false);
+        },
+        [&pingPromise](const string&, const string&)
+        {
+            pingPromise.set_value(false);
+        });
+    
+    return pingPromise;
 };
 
 shared_ptr<promise<bool>> NoscryptSigner::sign(shared_ptr<Event> event)
 {
     auto signingPromise = make_shared<promise<bool>>();
 
-    auto signerAvailable = this->_pingSigner().get_future();
+    auto signerAvailable = this->ping().get_future();
     if (signerAvailable.get() == false)
     {
         PLOG_ERROR << "Ping to the remote signer failed - the remote signer may be unavailable.";
@@ -474,45 +523,6 @@ inline shared_ptr<Filters> NoscryptSigner::_buildSignerMessageFilters() const
     filters->since = time(nullptr);
 
     return filters;
-};
-
-promise<bool> NoscryptSigner::_pingSigner()
-{
-    promise<bool> pingPromise;
-
-    // Generate a ping message and wrap it for the signer.
-    nlohmann::json jrpc =
-    {
-        { "id", this->_generateSignerRequestId() },
-        { "method", "ping" },
-        { "params", nlohmann::json::array() }
-    };
-    auto messageEvent = this->_wrapSignerMessage(jrpc);
-
-    // Generate a filter to receive the response.
-    auto pingFilter = this->_buildSignerMessageFilters();
-
-    this->_nostrService->publishEvent(messageEvent);
-
-    // TODO: Handle the relay response.
-    this->_nostrService->queryRelays(
-        pingFilter,
-        [this, &pingPromise](const string&, shared_ptr<Event> pongEvent)
-        {
-            // 
-            string pongMessage = this->_unwrapSignerMessage(pongEvent);
-            pingPromise.set_value(pongMessage == "pong");
-        },
-        [&pingPromise](const string&)
-        {
-            pingPromise.set_value(false);
-        },
-        [&pingPromise](const string&, const string&)
-        {
-            pingPromise.set_value(false);
-        });
-    
-    return pingPromise;
 };
 
 #pragma endregion

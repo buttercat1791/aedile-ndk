@@ -21,14 +21,17 @@ public:
 
     ~NoscryptSigner();
 
-    void receiveConnection(std::string connectionToken) override;
+    void receiveConnectionToken(std::string connectionToken) override;
 
-    std::string initiateConnection(
+    std::string generateConnectionToken(
         std::vector<std::string> relays,
-        std::string name,
-        std::string url,
-        std::string description
+        std::string secret,
+        std::optional<std::string> name,
+        std::optional<std::string> url,
+        std::optional<std::string> description
     ) override;
+
+    std::promise<bool> ping() override;
 
     std::shared_ptr<std::promise<bool>> sign(std::shared_ptr<data::Event> event) override;
 
@@ -123,12 +126,6 @@ private:
      * @returns A shared pointer to the constructed filter set.
      */
     inline std::shared_ptr<nostr::data::Filters> _buildSignerMessageFilters() const;
-
-    /**
-     * @brief Pings the remote signer to confirm that it is online and available.
-     * @returns A promise that will be set to `true` if the signer is available, `false` otherwise.
-     */
-    std::promise<bool> _pingSigner();
 
     #pragma endregion
 
