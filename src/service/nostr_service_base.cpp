@@ -1,55 +1,61 @@
-#include "nostr.hpp"
-#include "client/web_socket_client.hpp"
+#include <exception>
+#include <future>
+#include <stdexcept>
+#include <thread>
 #include <unordered_set>
 
+#include <uuid_v4.h>
+
+#include "service/nostr_service_base.hpp"
+
 using namespace nlohmann;
+using namespace nostr::service;
 using namespace std;
 
-namespace nostr
-{
-NostrService::NostrService(
+NostrServiceBase::NostrServiceBase(
     shared_ptr<plog::IAppender> appender,
-    shared_ptr<client::IWebSocketClient> client,
-    shared_ptr<ISigner> signer)
-: NostrService(appender, client, signer, {}) { };
+    shared_ptr<client::IWebSocketClient> client
+) : NostrServiceBase(appender, client, {}) { };
 
-NostrService::NostrService(
+NostrServiceBase::NostrServiceBase(
     shared_ptr<plog::IAppender> appender,
     shared_ptr<client::IWebSocketClient> client,
-    shared_ptr<ISigner> signer,
-    vector<string> relays)
-: _defaultRelays(relays), _client(client), _signer(signer)
+    vector<string> relays
+) : _defaultRelays(relays), _client(client)
 {
     plog::init(plog::debug, appender.get());
     client->start();
 };
 
-NostrService::~NostrService()
+NostrServiceBase::~NostrServiceBase()
 {
     this->_client->stop();
 };
 
-vector<string> NostrService::defaultRelays() const { return this->_defaultRelays; };
+vector<string> NostrServiceBase::defaultRelays() const
+{ return this->_defaultRelays; };
 
-vector<string> NostrService::activeRelays() const { return this->_activeRelays; };
+vector<string> NostrServiceBase::activeRelays() const
+{ return this->_activeRelays; };
 
-unordered_map<string, vector<string>> NostrService::subscriptions() const { return this->_subscriptions; };
+unordered_map<string, vector<string>> NostrServiceBase::subscriptions() const
+{ return this->_subscriptions; };
 
-vector<string> NostrService::openRelayConnections()
+vector<string> NostrServiceBase::openRelayConnections()
 {
     return this->openRelayConnections(this->_defaultRelays);
 };
 
-vector<string> NostrService::openRelayConnections(vector<string> relays)
+vector<string> NostrServiceBase::openRelayConnections(vector<string> relays)
 {
     PLOG_INFO << "Attempting to connect to Nostr relays.";
-    vector<string> unconnectedRelays = this->getUnconnectedRelays(relays);
+    vector<string> unconnectedRelays = this->_getUnconnectedRelays(relays);
 
     vector<thread> connectionThreads;
     for (string relay : unconnectedRelays)
     {
         thread connectionThread([this, relay]() {
-            this->connect(relay);
+            this->_connect(relay);
         });
         connectionThreads.push_back(move(connectionThread));
     }
@@ -59,15 +65,15 @@ vector<string> NostrService::openRelayConnections(vector<string> relays)
         connectionThread.join();
     }
 
-    size_t targetCount = relays.size();
-    size_t activeCount = this->_activeRelays.size();
+    std::size_t targetCount = relays.size();
+    std::size_t activeCount = this->_activeRelays.size();
     PLOG_INFO << "Connected to " << activeCount << "/" << targetCount << " target relays.";
 
     // This property should only contain successful relays at this point.
     return this->_activeRelays;
 };
 
-void NostrService::closeRelayConnections()
+void NostrServiceBase::closeRelayConnections()
 {
     if (this->_activeRelays.size() == 0)
     {
@@ -78,16 +84,16 @@ void NostrService::closeRelayConnections()
     this->closeRelayConnections(this->_activeRelays);
 };
 
-void NostrService::closeRelayConnections(vector<string> relays)
+void NostrServiceBase::closeRelayConnections(vector<string> relays)
 {
     PLOG_INFO << "Disconnecting from Nostr relays.";
-    vector<string> connectedRelays = getConnectedRelays(relays);
+    vector<string> connectedRelays = this->_getConnectedRelays(relays);
 
     vector<thread> disconnectionThreads;
     for (string relay : connectedRelays)
     {
         thread disconnectionThread([this, relay]() {
-            this->disconnect(relay);
+            this->_disconnect(relay);
         });
         disconnectionThreads.push_back(move(disconnectionThread));
 
@@ -103,7 +109,9 @@ void NostrService::closeRelayConnections(vector<string> relays)
 };
 
 // TODO: Make this method return a promise.
-tuple<vector<string>, vector<string>> NostrService::publishEvent(shared_ptr<Event> event)
+tuple<vector<string>, vector<string>> NostrServiceBase::publishEvent(
+    shared_ptr<nostr::data::Event> event
+)
 {
     vector<string> successfulRelays;
     vector<string> failedRelays;
@@ -113,7 +121,6 @@ tuple<vector<string>, vector<string>> NostrService::publishEvent(shared_ptr<Even
     json message;
     try
     {
-        this->_signer->sign(event);
         message = json::array({ "EVENT", event->serialize() });
     }
     catch (const std::invalid_argument& e)
@@ -140,19 +147,22 @@ tuple<vector<string>, vector<string>> NostrService::publishEvent(shared_ptr<Even
             relay,
             [this, &relay, &event, &publishPromise](string response)
             {
-                this->onAcceptance(response, [this, &relay, &event, &publishPromise](bool isAccepted)
-                {
-                    if (isAccepted)
+                this->_onAcceptance(
+                    response,
+                    [this, &relay, &event, &publishPromise](bool isAccepted)
                     {
-                        PLOG_INFO << "Relay " << relay << " accepted event: " << event->id;
-                        publishPromise.set_value(make_tuple(relay, true));
+                        if (isAccepted)
+                        {
+                            PLOG_INFO << "Relay " << relay << " accepted event: " << event->id;
+                            publishPromise.set_value(make_tuple(relay, true));
+                        }
+                        else
+                        {
+                            PLOG_WARNING << "Relay " << relay << " rejected event: " << event->id;
+                            publishPromise.set_value(make_tuple(relay, false));
+                        }
                     }
-                    else
-                    {
-                        PLOG_WARNING << "Relay " << relay << " rejected event: " << event->id;
-                        publishPromise.set_value(make_tuple(relay, false));
-                    }
-                });
+                );
             });
 
         if (!success)
@@ -175,17 +185,18 @@ tuple<vector<string>, vector<string>> NostrService::publishEvent(shared_ptr<Even
         }
     }
 
-    size_t targetCount = targetRelays.size();
-    size_t successfulCount = successfulRelays.size();
+    std::size_t targetCount = targetRelays.size();
+    std::size_t successfulCount = successfulRelays.size();
     PLOG_INFO << "Published event to " << successfulCount << "/" << targetCount << " target relays.";
 
     return make_tuple(successfulRelays, failedRelays);
 };
 
 // TODO: Add a timeout to this method to prevent hanging while waiting for the relay.
-future<vector<shared_ptr<Event>>> NostrService::queryRelays(shared_ptr<Filters> filters)
+future<vector<shared_ptr<nostr::data::Event>>> NostrServiceBase::queryRelays(
+    shared_ptr<nostr::data::Filters> filters)
 {
-    return async(launch::async, [this, filters]() -> vector<shared_ptr<Event>>
+    return async(launch::async, [this, filters]() -> vector<shared_ptr<nostr::data::Event>>
     {
         if (filters->limit > 64 || filters->limit < 1)
         {
@@ -193,9 +204,9 @@ future<vector<shared_ptr<Event>>> NostrService::queryRelays(shared_ptr<Filters> 
             filters->limit = 16;
         }
 
-        vector<shared_ptr<Event>> events;
+        vector<shared_ptr<nostr::data::Event>> events;
 
-        string subscriptionId = this->generateSubscriptionId();
+        string subscriptionId = this->_generateSubscriptionId();
         string request;
 
         try
@@ -231,9 +242,9 @@ future<vector<shared_ptr<Event>>> NostrService::queryRelays(shared_ptr<Filters> 
                 relay,
                 [this, &relay, &events, &eosePromise, &uniqueEventIds](string payload)
                 {
-                    this->onSubscriptionMessage(
+                    this->_onSubscriptionMessage(
                         payload,
-                        [&events, &uniqueEventIds](const string&, shared_ptr<Event> event)
+                        [&events, &uniqueEventIds](const string&, shared_ptr<nostr::data::Event> event)
                         {
                             // Check if the event is unique before adding.
                             if (uniqueEventIds.insert(event->id).second)
@@ -249,7 +260,8 @@ future<vector<shared_ptr<Event>>> NostrService::queryRelays(shared_ptr<Filters> 
                         {
                             eosePromise.set_value(make_tuple(relay, false));
                         });
-                });
+                }
+            );
 
             if (success)
             {
@@ -286,16 +298,17 @@ future<vector<shared_ptr<Event>>> NostrService::queryRelays(shared_ptr<Filters> 
     });
 };
 
-string NostrService::queryRelays(
-    shared_ptr<Filters> filters,
-    function<void(const string&, shared_ptr<Event>)> eventHandler,
+string NostrServiceBase::queryRelays(
+    shared_ptr<nostr::data::Filters> filters,
+    function<void(const string&, shared_ptr<nostr::data::Event>)> eventHandler,
     function<void(const string&)> eoseHandler,
-    function<void(const string&, const string&)> closeHandler)
+    function<void(const string&, const string&)> closeHandler
+)
 {
     vector<string> successfulRelays;
     vector<string> failedRelays;
 
-    string subscriptionId = this->generateSubscriptionId();
+    string subscriptionId = this->_generateSubscriptionId();
     string request = filters->serialize(subscriptionId);
     vector<future<tuple<string, bool>>> requestFutures;
     for (const string relay : this->_activeRelays)
@@ -312,9 +325,10 @@ string NostrService::queryRelays(
                     relay,
                     [this, &eventHandler, &eoseHandler, &closeHandler](string payload)
                     {
-                        this->onSubscriptionMessage(payload, eventHandler, eoseHandler, closeHandler);
+                        this->_onSubscriptionMessage(payload, eventHandler, eoseHandler, closeHandler);
                     });
-            });
+            }
+        );
         requestFutures.push_back(move(requestFuture));
     }
 
@@ -331,20 +345,20 @@ string NostrService::queryRelays(
         }
     }
 
-    size_t targetCount = this->_activeRelays.size();
-    size_t successfulCount = successfulRelays.size();
+    std::size_t targetCount = this->_activeRelays.size();
+    std::size_t successfulCount = successfulRelays.size();
     PLOG_INFO << "Sent query to " << successfulCount << "/" << targetCount << " open relay connections.";
 
     return subscriptionId;
 };
 
-tuple<vector<string>, vector<string>> NostrService::closeSubscription(string subscriptionId)
+tuple<vector<string>, vector<string>> NostrServiceBase::closeSubscription(string subscriptionId)
 {
     vector<string> successfulRelays;
     vector<string> failedRelays;
 
     vector<string> subscriptionRelays;
-    size_t subscriptionRelayCount;
+    std::size_t subscriptionRelayCount;
     vector<future<tuple<string, bool>>> closeFutures;
 
     try
@@ -384,7 +398,7 @@ tuple<vector<string>, vector<string>> NostrService::closeSubscription(string sub
         }
     }
 
-    size_t successfulCount = successfulRelays.size();
+    std::size_t successfulCount = successfulRelays.size();
     PLOG_INFO << "Sent CLOSE request for subscription " << subscriptionId << " to " << successfulCount << "/" << subscriptionRelayCount << " open relay connections.";
 
     // If there were no failures, and the subscription has been closed on all of its relays, forget
@@ -398,21 +412,21 @@ tuple<vector<string>, vector<string>> NostrService::closeSubscription(string sub
     return make_tuple(successfulRelays, failedRelays);
 };
 
-bool NostrService::closeSubscription(string subscriptionId, string relay)
+bool NostrServiceBase::closeSubscription(string subscriptionId, string relay)
 {
-    if (!this->hasSubscription(subscriptionId, relay))
+    if (!this->_hasSubscription(subscriptionId, relay))
     {
         PLOG_WARNING << "Subscription " << subscriptionId << " not found on relay " << relay;
         return false;
     }
 
-    if (!this->isConnected(relay))
+    if (!this->_isConnected(relay))
     {
         PLOG_WARNING << "Relay " << relay << " is not connected.";
         return false;
     }
 
-    string request = this->generateCloseRequest(subscriptionId);
+    string request = this->_generateCloseRequest(subscriptionId);
     auto [uri, success] = this->_client->send(request, relay);
 
     if (success)
@@ -438,7 +452,7 @@ bool NostrService::closeSubscription(string subscriptionId, string relay)
     return success;
 };
 
-vector<string> NostrService::closeSubscriptions()
+vector<string> NostrServiceBase::closeSubscriptions()
 {
     unique_lock<mutex> lock(this->_propertyMutex);
     vector<string> subscriptionIds;
@@ -461,7 +475,7 @@ vector<string> NostrService::closeSubscriptions()
     return remainingSubscriptions;
 };
 
-vector<string> NostrService::getConnectedRelays(vector<string> relays)
+vector<string> NostrServiceBase::_getConnectedRelays(vector<string> relays)
 {
     PLOG_VERBOSE << "Identifying connected relays.";
     vector<string> connectedRelays;
@@ -478,7 +492,7 @@ vector<string> NostrService::getConnectedRelays(vector<string> relays)
         }
         else if (isActive && !isConnected)
         {
-            this->eraseActiveRelay(relay);
+            this->_eraseActiveRelay(relay);
         }
         else if (!isActive && isConnected)
         {
@@ -489,7 +503,7 @@ vector<string> NostrService::getConnectedRelays(vector<string> relays)
     return connectedRelays;
 };
 
-vector<string> NostrService::getUnconnectedRelays(vector<string> relays)
+vector<string> NostrServiceBase::_getUnconnectedRelays(vector<string> relays)
 {
     PLOG_VERBOSE << "Identifying unconnected relays.";
     vector<string> unconnectedRelays;
@@ -508,7 +522,7 @@ vector<string> NostrService::getUnconnectedRelays(vector<string> relays)
         else if (isActive && !isConnected)
         {
             PLOG_VERBOSE << "Relay " << relay << " is active but not connected.  Removing from active relays list.";
-            this->eraseActiveRelay(relay);
+            this->_eraseActiveRelay(relay);
             unconnectedRelays.push_back(relay);
         }
         else if (!isActive && isConnected)
@@ -520,7 +534,7 @@ vector<string> NostrService::getUnconnectedRelays(vector<string> relays)
     return unconnectedRelays;
 };
 
-bool NostrService::isConnected(string relay)
+bool NostrServiceBase::_isConnected(string relay)
 {
     auto it = find(this->_activeRelays.begin(), this->_activeRelays.end(), relay);
     if (it != this->_activeRelays.end()) // If the relay is in this->_activeRelays
@@ -530,7 +544,7 @@ bool NostrService::isConnected(string relay)
     return false;
 };
 
-void NostrService::eraseActiveRelay(string relay)
+void NostrServiceBase::_eraseActiveRelay(string relay)
 {
     auto it = find(this->_activeRelays.begin(), this->_activeRelays.end(), relay);
     if (it != this->_activeRelays.end()) // If the relay is in this->_activeRelays
@@ -539,7 +553,7 @@ void NostrService::eraseActiveRelay(string relay)
     }
 };
 
-void NostrService::connect(string relay)
+void NostrServiceBase::_connect(string relay)
 {
     PLOG_VERBOSE << "Connecting to relay " << relay;
     this->_client->openConnection(relay);
@@ -558,28 +572,28 @@ void NostrService::connect(string relay)
     }
 };
 
-void NostrService::disconnect(string relay)
+void NostrServiceBase::_disconnect(string relay)
 {
     this->_client->closeConnection(relay);
 
     lock_guard<mutex> lock(this->_propertyMutex);
-    this->eraseActiveRelay(relay);
+    this->_eraseActiveRelay(relay);
 };
 
-string NostrService::generateSubscriptionId()
+string NostrServiceBase::_generateSubscriptionId()
 {
     UUIDv4::UUIDGenerator<std::mt19937_64> uuidGenerator;
     UUIDv4::UUID uuid = uuidGenerator.getUUID();
     return uuid.str();
 };
 
-string NostrService::generateCloseRequest(string subscriptionId)
+string NostrServiceBase::_generateCloseRequest(string subscriptionId)
 {
     json jarr = json::array({ "CLOSE", subscriptionId });
     return jarr.dump();
 };
 
-bool NostrService::hasSubscription(string subscriptionId)
+bool NostrServiceBase::_hasSubscription(string subscriptionId)
 {
     lock_guard<mutex> lock(this->_propertyMutex);
     auto it = this->_subscriptions.find(subscriptionId);
@@ -587,7 +601,7 @@ bool NostrService::hasSubscription(string subscriptionId)
     return it != this->_subscriptions.end();
 };
 
-bool NostrService::hasSubscription(string subscriptionId, string relay)
+bool NostrServiceBase::_hasSubscription(string subscriptionId, string relay)
 {
     lock_guard<mutex> lock(this->_propertyMutex);
     auto subscriptionIt = this->_subscriptions.find(subscriptionId);
@@ -603,11 +617,12 @@ bool NostrService::hasSubscription(string subscriptionId, string relay)
     return relayIt != relays.end();
 };
 
-void NostrService::onSubscriptionMessage(
+void NostrServiceBase::_onSubscriptionMessage(
     string message,
-    function<void(const string&, shared_ptr<Event>)> eventHandler,
+    function<void(const string&, shared_ptr<nostr::data::Event>)> eventHandler,
     function<void(const string&)> eoseHandler,
-    function<void(const string&, const string&)> closeHandler)
+    function<void(const string&, const string&)> closeHandler
+)
 {
     try
     {
@@ -616,8 +631,8 @@ void NostrService::onSubscriptionMessage(
         if (messageType == "EVENT")
         {
             string subscriptionId = jMessage.at(1);
-            Event event = Event::fromString(jMessage.at(2));
-            eventHandler(subscriptionId, make_shared<Event>(event));
+            nostr::data::Event event = nostr::data::Event::fromString(jMessage.at(2));
+            eventHandler(subscriptionId, make_shared<nostr::data::Event>(event));
         }
         else if (messageType == "EOSE")
         {
@@ -648,7 +663,10 @@ void NostrService::onSubscriptionMessage(
     }
 };
 
-void NostrService::onAcceptance(string message, function<void(const bool)> acceptanceHandler)
+void NostrServiceBase::_onAcceptance(
+    string message,
+    function<void(const bool)> acceptanceHandler
+)
 {
     try
     {
@@ -666,4 +684,3 @@ void NostrService::onAcceptance(string message, function<void(const bool)> accep
         throw je;
     }
 };
-} // namespace nostr

@@ -6,7 +6,23 @@
         "generator": "Unix Makefiles",
         "binaryDir": "${sourceDir}/build/linux",
         "cacheVariables": {
-          "CMAKE_TOOLCHAIN_FILE": "$env{VCPKG_ROOT}/scripts/buildsystems/vcpkg.cmake"
+          "AEDILE_INCLUDE_TESTS": "OFF",
+          "CMAKE_BUILD_TYPE": "Release",
+          "CMAKE_TOOLCHAIN_FILE": "${sourceDir}/vcpkg/scripts/buildsystems/vcpkg.cmake",
+          "VCPKG_MANIFEST_MODE": "ON",
+          "VCPKG_TARGET_TRIPLET": "x64-linux"
+        }
+      },
+      {
+        "name": "linux tests",
+        "generator": "Unix Makefiles",
+        "binaryDir": "${sourceDir}/build/linux",
+        "cacheVariables": {
+          "AEDILE_INCLUDE_TESTS": "ON",
+          "CMAKE_BUILD_TYPE": "Release",
+          "CMAKE_TOOLCHAIN_FILE": "${sourceDir}/vcpkg/scripts/buildsystems/vcpkg.cmake",
+          "VCPKG_MANIFEST_MODE": "ON",
+          "VCPKG_TARGET_TRIPLET": "x64-linux"
         }
       }
     ],
@@ -15,12 +31,17 @@
         "name": "linux",
         "configurePreset": "linux",
         "jobs": 4
+      },
+      {
+        "name": "linux tests",
+        "configurePreset": "linux tests",
+        "jobs": 4
       }
     ],
     "testPresets": [
       {
         "name": "linux",
-        "configurePreset": "linux"
+        "configurePreset": "linux tests"
       }
     ]
   }

@@ -33,13 +33,12 @@ The SDK aims to support Linux, Windows, and macOS build targets.  It currently s
 To build the SDK on Linux, run the following commands from the project root:
 
 ```bash
-export VCPKG_ROOT=/path/to/vcpkg/installation
-cmake --preset=linux # configuration step
-cmake --build build/linux # compilation or build step
+cmake --build --preset="linux"
 ```
 
-To run unit tests, use the following command:
+To run unit tests, use the following commands:
 
 ```bash
-ctest --preset linux
+cmake --build --preset="linux tests"
+ctest --preset="linux"
 ```

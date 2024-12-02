@@ -1,15 +1,17 @@
 #include <chrono>
+#include <future>
+#include <iostream>
+
 #include <gmock/gmock.h>
 #include <gtest/gtest.h>
 #include <nlohmann/json.hpp>
 #include <plog/Appenders/ConsoleAppender.h>
 #include <plog/Formatters/TxtFormatter.h>
-#include <iostream>
 #include <websocketpp/client.hpp>
 
-#include <client/web_socket_client.hpp>
-#include <nostr.hpp>
+#include "service/nostr_service_base.hpp"
 
+using namespace nostr;
 using namespace std;
 using namespace ::testing;
 
@@ -29,16 +31,7 @@ public:
     MOCK_METHOD(void, closeConnection, (string uri), (override));
 };
 
-class FakeSigner : public nostr::ISigner
-{
-public:
-    void sign(shared_ptr<nostr::Event> event) override
-    {
-        event->sig = "fake_signature";
-    }
-};
-
-class NostrServiceTest : public testing::Test
+class NostrServiceBaseTest : public testing::Test
 {
 public:
     inline static const vector<string> defaultTestRelays =
@@ -47,9 +40,9 @@ public:
         "wss://nostr.thesamecat.io"
     };
 
-    static const nostr::Event getTextNoteTestEvent()
+    static const nostr::data::Event getTextNoteTestEvent()
     {
-        nostr::Event event;
+        nostr::data::Event event;
         event.pubkey = "13tn5ccv2guflxgffq4aj0hw5x39pz70zcdrfd6vym887gry38zys28dask";
         event.kind = 1;
         event.tags =
@@ -63,12 +56,12 @@ public:
         return event;
     };
 
-    static const vector<nostr::Event> getMultipleTextNoteTestEvents()
+    static const vector<nostr::data::Event> getMultipleTextNoteTestEvents()
     {
         auto now = std::chrono::system_clock::now();
         std::time_t currentTime = std::chrono::system_clock::to_time_t(now);
 
-        nostr::Event event1;
+        nostr::data::Event event1;
         event1.pubkey = "13tn5ccv2guflxgffq4aj0hw5x39pz70zcdrfd6vym887gry38zys28dask";
         event1.kind = 1;
         event1.tags =
@@ -80,7 +73,7 @@ public:
         event1.content = "Hello, World!";
         event1.createdAt = currentTime;
 
-        nostr::Event event2;
+        nostr::data::Event event2;
         event2.pubkey = "1l9d9jh67rkwayalrxcy686aujyz5pper5kzjv8jvg8pu9v9ns4ls0xvq42";
         event2.kind = 1;
         event2.tags =
@@ -91,8 +84,8 @@ public:
         };
         event2.content = "Welcome to Nostr!";
         event2.createdAt = currentTime;
-
-        nostr::Event event3;
+        
+        nostr::data::Event event3;
         event3.pubkey = "187ujhtmnv82ftg03h4heetwk3dd9mlfkf8th3fvmrk20nxk9mansuzuyla";
         event3.kind = 1;
         event3.tags =
@@ -107,9 +100,9 @@ public:
         return { event1, event2, event3 };
     };
 
-    static const nostr::Event getLongFormTestEvent()
+    static const nostr::data::Event getLongFormTestEvent()
     {
-        nostr::Event event;
+        nostr::data::Event event;
         event.pubkey = "13tn5ccv2guflxgffq4aj0hw5x39pz70zcdrfd6vym887gry38zys28dask";
         event.kind = 30023;
         event.tags =
@@ -123,11 +116,8 @@ public:
         return event;
     }
 
-    static const string getTestEventMessage(shared_ptr<nostr::Event> event, string subscriptionId)
+    static const string getTestEventMessage(shared_ptr<nostr::data::Event> event, string subscriptionId)
     {
-        auto signer = make_unique<FakeSigner>();
-        signer->sign(event);
-
         json jarr = json::array();
         jarr.push_back("EVENT");
         jarr.push_back(subscriptionId);
@@ -136,9 +126,9 @@ public:
         return jarr.dump();
     }
 
-    static const nostr::Filters getKind0And1TestFilters()
+    static const nostr::data::Filters getKind0And1TestFilters()
     {
-        nostr::Filters filters;
+        nostr::data::Filters filters;
         filters.authors = {
             "13tn5ccv2guflxgffq4aj0hw5x39pz70zcdrfd6vym887gry38zys28dask",
             "1l9d9jh67rkwayalrxcy686aujyz5pper5kzjv8jvg8pu9v9ns4ls0xvq42",
@@ -150,9 +140,9 @@ public:
         return filters;
     }
 
-    static const nostr::Filters getKind30023TestFilters()
+    static const nostr::data::Filters getKind30023TestFilters()
     {
-        nostr::Filters filters;
+        nostr::data::Filters filters;
         filters.authors = {
             "13tn5ccv2guflxgffq4aj0hw5x39pz70zcdrfd6vym887gry38zys28dask",
             "1l9d9jh67rkwayalrxcy686aujyz5pper5kzjv8jvg8pu9v9ns4ls0xvq42",
@@ -167,26 +157,24 @@ public:
 protected:
     shared_ptr<plog::ConsoleAppender<plog::TxtFormatter>> testAppender;
     shared_ptr<MockWebSocketClient> mockClient;
-    shared_ptr<FakeSigner> fakeSigner;
 
     void SetUp() override
     {
         testAppender = make_shared<plog::ConsoleAppender<plog::TxtFormatter>>();
         mockClient = make_shared<MockWebSocketClient>();
-        fakeSigner = make_shared<FakeSigner>();
     };
 };
 
-TEST_F(NostrServiceTest, Constructor_StartsClient)
+TEST_F(NostrServiceBaseTest, Constructor_StartsClient)
 {
     EXPECT_CALL(*mockClient, start()).Times(1);
 
-    auto nostrService = make_unique<nostr::NostrService>(testAppender, mockClient, fakeSigner);
+    auto nostrService = make_unique<nostr::service::NostrServiceBase>(testAppender, mockClient);
 };
 
-TEST_F(NostrServiceTest, Constructor_InitializesService_WithNoDefaultRelays)
+TEST_F(NostrServiceBaseTest, Constructor_InitializesService_WithNoDefaultRelays)
 {
-    auto nostrService = make_unique<nostr::NostrService>(testAppender, mockClient, fakeSigner);
+    auto nostrService = make_unique<nostr::service::NostrServiceBase>(testAppender, mockClient);
     auto defaultRelays = nostrService->defaultRelays();
     auto activeRelays = nostrService->activeRelays();
 
@@ -194,12 +182,11 @@ TEST_F(NostrServiceTest, Constructor_InitializesService_WithNoDefaultRelays)
     ASSERT_EQ(activeRelays.size(), 0);
 };
 
-TEST_F(NostrServiceTest, Constructor_InitializesService_WithProvidedDefaultRelays)
+TEST_F(NostrServiceBaseTest, Constructor_InitializesService_WithProvidedDefaultRelays)
 {
-    auto nostrService = make_unique<nostr::NostrService>(
+    auto nostrService = make_unique<nostr::service::NostrServiceBase>(
         testAppender,
         mockClient,
-        fakeSigner,
         defaultTestRelays);
     auto defaultRelays = nostrService->defaultRelays();
     auto activeRelays = nostrService->activeRelays();
@@ -212,14 +199,16 @@ TEST_F(NostrServiceTest, Constructor_InitializesService_WithProvidedDefaultRelay
     ASSERT_EQ(activeRelays.size(), 0);
 };
 
-TEST_F(NostrServiceTest, Destructor_StopsClient)
+TEST_F(NostrServiceBaseTest, Destructor_StopsClient)
 {
     EXPECT_CALL(*mockClient, start()).Times(1);
 
-    auto nostrService = make_unique<nostr::NostrService>(testAppender, mockClient, fakeSigner);
+    auto nostrService = make_unique<nostr::service::NostrServiceBase>(
+        testAppender,
+        mockClient);
 };
 
-TEST_F(NostrServiceTest, OpenRelayConnections_OpensConnections_ToDefaultRelays)
+TEST_F(NostrServiceBaseTest, OpenRelayConnections_OpensConnections_ToDefaultRelays)
 {
     mutex connectionStatusMutex;
     auto connectionStatus = make_shared<unordered_map<string, bool>>();
@@ -240,11 +229,10 @@ TEST_F(NostrServiceTest, OpenRelayConnections_OpensConnections_ToDefaultRelays)
             }
             return status;
         }));
-
-    auto nostrService = make_unique<nostr::NostrService>(
+    
+    auto nostrService = make_unique<nostr::service::NostrServiceBase>(
         testAppender,
         mockClient,
-        fakeSigner,
         defaultTestRelays);
     nostrService->openRelayConnections();
 
@@ -256,7 +244,7 @@ TEST_F(NostrServiceTest, OpenRelayConnections_OpensConnections_ToDefaultRelays)
     }
 };
 
-TEST_F(NostrServiceTest, OpenRelayConnections_OpensConnections_ToProvidedRelays)
+TEST_F(NostrServiceBaseTest, OpenRelayConnections_OpensConnections_ToProvidedRelays)
 {
     vector<string> testRelays = { "wss://nos.lol" };
 
@@ -280,10 +268,9 @@ TEST_F(NostrServiceTest, OpenRelayConnections_OpensConnections_ToProvidedRelays)
             return status;
         }));
 
-    auto nostrService = make_unique<nostr::NostrService>(
+    auto nostrService = make_unique<nostr::service::NostrServiceBase>(
         testAppender,
         mockClient,
-        fakeSigner,
         defaultTestRelays);
     nostrService->openRelayConnections(testRelays);
 
@@ -295,7 +282,7 @@ TEST_F(NostrServiceTest, OpenRelayConnections_OpensConnections_ToProvidedRelays)
     }
 };
 
-TEST_F(NostrServiceTest, OpenRelayConnections_AddsOpenConnections_ToActiveRelays)
+TEST_F(NostrServiceBaseTest, OpenRelayConnections_AddsOpenConnections_ToActiveRelays)
 {
     vector<string> testRelays = { "wss://nos.lol" };
 
@@ -321,10 +308,9 @@ TEST_F(NostrServiceTest, OpenRelayConnections_AddsOpenConnections_ToActiveRelays
             return status;
         }));
 
-    auto nostrService = make_unique<nostr::NostrService>(
+    auto nostrService = make_unique<nostr::service::NostrServiceBase>(
         testAppender,
         mockClient,
-        fakeSigner,
         defaultTestRelays);
     nostrService->openRelayConnections();
 
@@ -349,7 +335,7 @@ TEST_F(NostrServiceTest, OpenRelayConnections_AddsOpenConnections_ToActiveRelays
     }
 };
 
-TEST_F(NostrServiceTest, CloseRelayConnections_ClosesConnections_ToActiveRelays)
+TEST_F(NostrServiceBaseTest, CloseRelayConnections_ClosesConnections_ToActiveRelays)
 {
     mutex connectionStatusMutex;
     auto connectionStatus = make_shared<unordered_map<string, bool>>();
@@ -368,10 +354,9 @@ TEST_F(NostrServiceTest, CloseRelayConnections_ClosesConnections_ToActiveRelays)
             return status;
         }));
 
-    auto nostrService = make_unique<nostr::NostrService>(
+    auto nostrService = make_unique<nostr::service::NostrServiceBase>(
         testAppender,
         mockClient,
-        fakeSigner,
         defaultTestRelays);
     nostrService->openRelayConnections();
 
@@ -384,7 +369,7 @@ TEST_F(NostrServiceTest, CloseRelayConnections_ClosesConnections_ToActiveRelays)
     ASSERT_EQ(activeRelays.size(), 0);
 };
 
-TEST_F(NostrServiceTest, CloseRelayConnections_RemovesClosedConnections_FromActiveRelays)
+TEST_F(NostrServiceBaseTest, CloseRelayConnections_RemovesClosedConnections_FromActiveRelays)
 {
     vector<string> testRelays = { "wss://nos.lol" };
     vector<string> allTestRelays = { defaultTestRelays[0], defaultTestRelays[1], testRelays[0] };
@@ -407,10 +392,9 @@ TEST_F(NostrServiceTest, CloseRelayConnections_RemovesClosedConnections_FromActi
             return status;
         }));
 
-    auto nostrService = make_unique<nostr::NostrService>(
+    auto nostrService = make_unique<nostr::service::NostrServiceBase>(
         testAppender,
         mockClient,
-        fakeSigner,
         allTestRelays);
     nostrService->openRelayConnections();
 
@@ -430,7 +414,7 @@ TEST_F(NostrServiceTest, CloseRelayConnections_RemovesClosedConnections_FromActi
     }
 };
 
-TEST_F(NostrServiceTest, PublishEvent_CorrectlyIndicates_AllSuccesses)
+TEST_F(NostrServiceBaseTest, PublishEvent_CorrectlyIndicates_AllSuccesses)
 {
     mutex connectionStatusMutex;
     auto connectionStatus = make_shared<unordered_map<string, bool>>();
@@ -449,10 +433,9 @@ TEST_F(NostrServiceTest, PublishEvent_CorrectlyIndicates_AllSuccesses)
             return status;
         }));
 
-    auto nostrService = make_unique<nostr::NostrService>(
+    auto nostrService = make_unique<nostr::service::NostrServiceBase>(
         testAppender,
         mockClient,
-        fakeSigner,
         defaultTestRelays);
     nostrService->openRelayConnections();
 
@@ -461,15 +444,15 @@ TEST_F(NostrServiceTest, PublishEvent_CorrectlyIndicates_AllSuccesses)
         .WillRepeatedly(Invoke([](string message, string uri, function<void(const string&)> messageHandler)
         {
             json messageArr = json::parse(message);
-            auto event = nostr::Event::fromString(messageArr[1]);
+            auto event = nostr::data::Event::fromString(messageArr[1]);
 
             json jarr = json::array({ "OK", event.id, true, "Event accepted" });
             messageHandler(jarr.dump());
 
             return make_tuple(uri, true);
         }));
-
-    auto testEvent = make_shared<nostr::Event>(getTextNoteTestEvent());
+    
+    auto testEvent = make_shared<nostr::data::Event>(getTextNoteTestEvent());
     auto [successes, failures] = nostrService->publishEvent(testEvent);
 
     ASSERT_EQ(successes.size(), defaultTestRelays.size());
@@ -481,7 +464,7 @@ TEST_F(NostrServiceTest, PublishEvent_CorrectlyIndicates_AllSuccesses)
     ASSERT_EQ(failures.size(), 0);
 };
 
-TEST_F(NostrServiceTest, PublishEvent_CorrectlyIndicates_AllFailures)
+TEST_F(NostrServiceBaseTest, PublishEvent_CorrectlyIndicates_AllFailures)
 {
     mutex connectionStatusMutex;
     auto connectionStatus = make_shared<unordered_map<string, bool>>();
@@ -500,10 +483,9 @@ TEST_F(NostrServiceTest, PublishEvent_CorrectlyIndicates_AllFailures)
             return status;
         }));
 
-    auto nostrService = make_unique<nostr::NostrService>(
+    auto nostrService = make_unique<nostr::service::NostrServiceBase>(
         testAppender,
         mockClient,
-        fakeSigner,
         defaultTestRelays);
     nostrService->openRelayConnections();
 
@@ -514,8 +496,8 @@ TEST_F(NostrServiceTest, PublishEvent_CorrectlyIndicates_AllFailures)
         {
             return make_tuple(uri, false);
         }));
-
-    auto testEvent = make_shared<nostr::Event>(getTextNoteTestEvent());
+    
+    auto testEvent = make_shared<nostr::data::Event>(getTextNoteTestEvent());
     auto [successes, failures] = nostrService->publishEvent(testEvent);
 
     ASSERT_EQ(successes.size(), 0);
@@ -527,7 +509,7 @@ TEST_F(NostrServiceTest, PublishEvent_CorrectlyIndicates_AllFailures)
     }
 };
 
-TEST_F(NostrServiceTest, PublishEvent_CorrectlyIndicates_MixedSuccessesAndFailures)
+TEST_F(NostrServiceBaseTest, PublishEvent_CorrectlyIndicates_MixedSuccessesAndFailures)
 {
     mutex connectionStatusMutex;
     auto connectionStatus = make_shared<unordered_map<string, bool>>();
@@ -546,10 +528,9 @@ TEST_F(NostrServiceTest, PublishEvent_CorrectlyIndicates_MixedSuccessesAndFailur
             return status;
         }));
 
-    auto nostrService = make_unique<nostr::NostrService>(
+    auto nostrService = make_unique<nostr::service::NostrServiceBase>(
         testAppender,
         mockClient,
-        fakeSigner,
         defaultTestRelays);
     nostrService->openRelayConnections();
 
@@ -566,15 +547,15 @@ TEST_F(NostrServiceTest, PublishEvent_CorrectlyIndicates_MixedSuccessesAndFailur
         .WillRepeatedly(Invoke([](string message, string uri, function<void(const string&)> messageHandler)
         {
             json messageArr = json::parse(message);
-            auto event = nostr::Event::fromString(messageArr[1]);
+            auto event = nostr::data::Event::fromString(messageArr[1]);
 
             json jarr = json::array({ "OK", event.id, true, "Event accepted" });
             messageHandler(jarr.dump());
 
             return make_tuple(uri, true);
         }));
-
-    auto testEvent = make_shared<nostr::Event>(getTextNoteTestEvent());
+    
+    auto testEvent = make_shared<nostr::data::Event>(getTextNoteTestEvent());
     auto [successes, failures] = nostrService->publishEvent(testEvent);
 
     ASSERT_EQ(successes.size(), 1);
@@ -584,7 +565,7 @@ TEST_F(NostrServiceTest, PublishEvent_CorrectlyIndicates_MixedSuccessesAndFailur
     ASSERT_EQ(failures[0], defaultTestRelays[0]);
 };
 
-TEST_F(NostrServiceTest, PublishEvent_CorrectlyIndicates_RejectedEvent)
+TEST_F(NostrServiceBaseTest, PublishEvent_CorrectlyIndicates_RejectedEvent)
 {
     mutex connectionStatusMutex;
     auto connectionStatus = make_shared<unordered_map<string, bool>>();
@@ -603,10 +584,9 @@ TEST_F(NostrServiceTest, PublishEvent_CorrectlyIndicates_RejectedEvent)
             return status;
         }));
 
-    auto nostrService = make_unique<nostr::NostrService>(
+    auto nostrService = make_unique<nostr::service::NostrServiceBase>(
         testAppender,
         mockClient,
-        fakeSigner,
         defaultTestRelays);
     nostrService->openRelayConnections();
 
@@ -616,15 +596,15 @@ TEST_F(NostrServiceTest, PublishEvent_CorrectlyIndicates_RejectedEvent)
         .WillRepeatedly(Invoke([](string message, string uri, function<void(const string&)> messageHandler)
         {
             json messageArr = json::parse(message);
-            auto event = nostr::Event::fromString(messageArr[1]);
+            auto event = nostr::data::Event::fromString(messageArr[1]);
 
             json jarr = json::array({ "OK", event.id, false, "Event rejected" });
             messageHandler(jarr.dump());
 
             return make_tuple(uri, true);
         }));
-
-    auto testEvent = make_shared<nostr::Event>(getTextNoteTestEvent());
+    
+    auto testEvent = make_shared<nostr::data::Event>(getTextNoteTestEvent());
     auto [successes, failures] = nostrService->publishEvent(testEvent);
 
     ASSERT_EQ(failures.size(), defaultTestRelays.size());
@@ -634,7 +614,7 @@ TEST_F(NostrServiceTest, PublishEvent_CorrectlyIndicates_RejectedEvent)
     }
 };
 
-TEST_F(NostrServiceTest, PublishEvent_CorrectlyIndicates_EventRejectedBySomeRelays)
+TEST_F(NostrServiceBaseTest, PublishEvent_CorrectlyIndicates_EventRejectedBySomeRelays)
 {
     mutex connectionStatusMutex;
     auto connectionStatus = make_shared<unordered_map<string, bool>>();
@@ -653,10 +633,9 @@ TEST_F(NostrServiceTest, PublishEvent_CorrectlyIndicates_EventRejectedBySomeRela
             return status;
         }));
 
-    auto nostrService = make_unique<nostr::NostrService>(
+    auto nostrService = make_unique<nostr::service::NostrServiceBase>(
         testAppender,
         mockClient,
-        fakeSigner,
         defaultTestRelays);
     nostrService->openRelayConnections();
 
@@ -667,7 +646,7 @@ TEST_F(NostrServiceTest, PublishEvent_CorrectlyIndicates_EventRejectedBySomeRela
         .WillRepeatedly(Invoke([](string message, string uri, function<void(const string&)> messageHandler)
         {
             json messageArr = json::parse(message);
-            auto event = nostr::Event::fromString(messageArr[1]);
+            auto event = nostr::data::Event::fromString(messageArr[1]);
 
             json jarr = json::array({ "OK", event.id, true, "Event accepted" });
             messageHandler(jarr.dump());
@@ -679,15 +658,15 @@ TEST_F(NostrServiceTest, PublishEvent_CorrectlyIndicates_EventRejectedBySomeRela
         .WillRepeatedly(Invoke([](string message, string uri, function<void(const string&)> messageHandler)
         {
             json messageArr = json::parse(message);
-            auto event = nostr::Event::fromString(messageArr[1]);
+            auto event = nostr::data::Event::fromString(messageArr[1]);
 
             json jarr = json::array({ "OK", event.id, false, "Event rejected" });
             messageHandler(jarr.dump());
 
             return make_tuple(uri, true);
         }));
-
-    auto testEvent = make_shared<nostr::Event>(getTextNoteTestEvent());
+    
+    auto testEvent = make_shared<nostr::data::Event>(getTextNoteTestEvent());
     auto [successes, failures] = nostrService->publishEvent(testEvent);
 
     ASSERT_EQ(successes.size(), 1);
@@ -697,7 +676,7 @@ TEST_F(NostrServiceTest, PublishEvent_CorrectlyIndicates_EventRejectedBySomeRela
     ASSERT_EQ(failures[0], defaultTestRelays[1]);
 };
 
-TEST_F(NostrServiceTest, QueryRelays_ReturnsEvents_UpToEOSE)
+TEST_F(NostrServiceBaseTest, QueryRelays_ReturnsEvents_UpToEOSE)
 {
     mutex connectionStatusMutex;
     auto connectionStatus = make_shared<unordered_map<string, bool>>();
@@ -716,32 +695,28 @@ TEST_F(NostrServiceTest, QueryRelays_ReturnsEvents_UpToEOSE)
             return status;
         }));
 
-    auto signer = make_unique<FakeSigner>();
-    auto nostrService = make_unique<nostr::NostrService>(
+    auto nostrService = make_unique<nostr::service::NostrServiceBase>(
         testAppender,
         mockClient,
-        fakeSigner,
         defaultTestRelays);
     nostrService->openRelayConnections();
 
     auto testEvents = getMultipleTextNoteTestEvents();
-    vector<shared_ptr<nostr::Event>> signedTestEvents;
-    for (nostr::Event testEvent : testEvents)
+    vector<shared_ptr<nostr::data::Event>> sendableTestEvents;
+    for (nostr::data::Event testEvent : testEvents)
     {
-        auto signedEvent = make_shared<nostr::Event>(testEvent);
-        signer->sign(signedEvent);
+        auto event = make_shared<nostr::data::Event>(testEvent);
+        auto serializedEvent = event->serialize();
+        auto deserializedEvent = nostr::data::Event::fromString(serializedEvent);
 
-        auto serializedEvent = signedEvent->serialize();
-        auto deserializedEvent = nostr::Event::fromString(serializedEvent);
-
-        signedEvent = make_shared<nostr::Event>(deserializedEvent);
-        signedTestEvents.push_back(signedEvent);
+        event = make_shared<nostr::data::Event>(deserializedEvent);
+        sendableTestEvents.push_back(event);
     }
 
     // Expect the query messages.
     EXPECT_CALL(*mockClient, send(HasSubstr("REQ"), _, _))
         .Times(2)
-        .WillRepeatedly(Invoke([&testEvents, &signer](
+        .WillRepeatedly(Invoke([&testEvents](
             string message,
             string uri,
             function<void(const string&)> messageHandler)
@@ -751,8 +726,7 @@ TEST_F(NostrServiceTest, QueryRelays_ReturnsEvents_UpToEOSE)
 
             for (auto event : testEvents)
             {
-                auto sendableEvent = make_shared<nostr::Event>(event);
-                signer->sign(sendableEvent);
+                auto sendableEvent = make_shared<nostr::data::Event>(event);
                 json jarr = json::array({ "EVENT", subscriptionId, sendableEvent->serialize() });
                 messageHandler(jarr.dump());
             }
@@ -770,9 +744,7 @@ TEST_F(NostrServiceTest, QueryRelays_ReturnsEvents_UpToEOSE)
             return make_tuple(uri, true);
         }));
 
-    auto filters = make_shared<nostr::Filters>(getKind0And1TestFilters());
-	
-    // await the future and get the results
+    auto filters = make_shared<nostr::data::Filters>(getKind0And1TestFilters());
     auto results = nostrService->queryRelays(filters).get();
 
     // Check results size to ensure there are no duplicates.
@@ -783,20 +755,20 @@ TEST_F(NostrServiceTest, QueryRelays_ReturnsEvents_UpToEOSE)
     {
         ASSERT_NE(
             find_if(
-                signedTestEvents.begin(),
-                signedTestEvents.end(),
-                [&resultEvent](shared_ptr<nostr::Event> testEvent)
+                sendableTestEvents.begin(),
+                sendableTestEvents.end(),
+                [&resultEvent](shared_ptr<nostr::data::Event> testEvent)
                 {
                     return *testEvent == *resultEvent;
                 }),
-            signedTestEvents.end());
+            sendableTestEvents.end());
     }
 
     auto subscriptions = nostrService->subscriptions();
     ASSERT_TRUE(subscriptions.empty());
 };
 
-TEST_F(NostrServiceTest, QueryRelays_CallsHandler_WithReturnedEvents)
+TEST_F(NostrServiceBaseTest, QueryRelays_CallsHandler_WithReturnedEvents)
 {
     mutex connectionStatusMutex;
     auto connectionStatus = make_shared<unordered_map<string, bool>>();
@@ -815,31 +787,27 @@ TEST_F(NostrServiceTest, QueryRelays_CallsHandler_WithReturnedEvents)
             return status;
         }));
 
-    auto signer = make_unique<FakeSigner>();
-    auto nostrService = make_unique<nostr::NostrService>(
+    auto nostrService = make_unique<nostr::service::NostrServiceBase>(
         testAppender,
         mockClient,
-        fakeSigner,
         defaultTestRelays);
     nostrService->openRelayConnections();
 
     auto testEvents = getMultipleTextNoteTestEvents();
-    vector<shared_ptr<nostr::Event>> signedTestEvents;
-    for (nostr::Event testEvent : testEvents)
+    vector<shared_ptr<nostr::data::Event>> sendableTestEvents;
+    for (nostr::data::Event testEvent : testEvents)
     {
-        auto signedEvent = make_shared<nostr::Event>(testEvent);
-        signer->sign(signedEvent);
+        auto event = make_shared<nostr::data::Event>(testEvent);
+        auto serializedEvent = event->serialize();
+        auto deserializedEvent = nostr::data::Event::fromString(serializedEvent);
 
-        auto serializedEvent = signedEvent->serialize();
-        auto deserializedEvent = nostr::Event::fromString(serializedEvent);
-
-        signedEvent = make_shared<nostr::Event>(deserializedEvent);
-        signedTestEvents.push_back(signedEvent);
+        event = make_shared<nostr::data::Event>(deserializedEvent);
+        sendableTestEvents.push_back(event);
     }
 
     EXPECT_CALL(*mockClient, send(HasSubstr("REQ"), _, _))
         .Times(2)
-        .WillRepeatedly(Invoke([&testEvents, &signer](
+        .WillRepeatedly(Invoke([&testEvents](
             string message,
             string uri,
             function<void(const string&)> messageHandler)
@@ -849,8 +817,7 @@ TEST_F(NostrServiceTest, QueryRelays_CallsHandler_WithReturnedEvents)
 
             for (auto event : testEvents)
             {
-                auto sendableEvent = make_shared<nostr::Event>(event);
-                signer->sign(sendableEvent);
+                auto sendableEvent = make_shared<nostr::data::Event>(event);
                 json jarr = json::array({ "EVENT", subscriptionId, sendableEvent->serialize() });
                 messageHandler(jarr.dump());
             }
@@ -861,25 +828,25 @@ TEST_F(NostrServiceTest, QueryRelays_CallsHandler_WithReturnedEvents)
             return make_tuple(uri, true);
         }));
 
-    auto filters = make_shared<nostr::Filters>(getKind0And1TestFilters());
+    auto filters = make_shared<nostr::data::Filters>(getKind0And1TestFilters());
     promise<void> eoseReceivedPromise;
     auto eoseReceivedFuture = eoseReceivedPromise.get_future();
     int eoseCount = 0;
 
     string generatedSubscriptionId = nostrService->queryRelays(
         filters,
-        [&generatedSubscriptionId, &signedTestEvents](const string& subscriptionId, shared_ptr<nostr::Event> event)
+        [&generatedSubscriptionId, &sendableTestEvents](const string& subscriptionId, shared_ptr<nostr::data::Event> event)
         {
             ASSERT_STREQ(subscriptionId.c_str(), generatedSubscriptionId.c_str());
             ASSERT_NE(
                 find_if(
-                    signedTestEvents.begin(),
-                    signedTestEvents.end(),
-                    [&event](shared_ptr<nostr::Event> testEvent)
+                    sendableTestEvents.begin(),
+                    sendableTestEvents.end(),
+                    [&event](shared_ptr<nostr::data::Event> testEvent)
                     {
                         return *testEvent == *event;
                     }),
-                signedTestEvents.end());
+                sendableTestEvents.end());
         },
         [&generatedSubscriptionId, &eoseReceivedPromise, &eoseCount]
         (const string& subscriptionId)
@@ -916,7 +883,7 @@ TEST_F(NostrServiceTest, QueryRelays_CallsHandler_WithReturnedEvents)
     ASSERT_TRUE(subscriptions.empty());
 };
 
-TEST_F(NostrServiceTest, Service_MaintainsMultipleSubscriptions_ThenClosesAll)
+TEST_F(NostrServiceBaseTest, Service_MaintainsMultipleSubscriptions_ThenClosesAll)
 {
     // Mock connections.
     mutex connectionStatusMutex;
@@ -936,33 +903,29 @@ TEST_F(NostrServiceTest, Service_MaintainsMultipleSubscriptions_ThenClosesAll)
             return status;
         }));
 
-    auto signer = make_unique<FakeSigner>();
-    auto nostrService = make_unique<nostr::NostrService>(
+    auto nostrService = make_unique<nostr::service::NostrServiceBase>(
         testAppender,
         mockClient,
-        fakeSigner,
         testRelays);
     nostrService->openRelayConnections();
 
     // Mock relay responses.
     auto testEvents = getMultipleTextNoteTestEvents();
-    vector<shared_ptr<nostr::Event>> signedTestEvents;
-    for (nostr::Event testEvent : testEvents)
+    vector<shared_ptr<nostr::data::Event>> sendableTestEvents;
+    for (nostr::data::Event testEvent : testEvents)
     {
-        auto signedEvent = make_shared<nostr::Event>(testEvent);
-        signer->sign(signedEvent);
+        auto event = make_shared<nostr::data::Event>(testEvent);
+        auto serializedEvent = event->serialize();
+        auto deserializedEvent = nostr::data::Event::fromString(serializedEvent);
 
-        auto serializedEvent = signedEvent->serialize();
-        auto deserializedEvent = nostr::Event::fromString(serializedEvent);
-
-        signedEvent = make_shared<nostr::Event>(deserializedEvent);
-        signedTestEvents.push_back(signedEvent);
+        event = make_shared<nostr::data::Event>(deserializedEvent);
+        sendableTestEvents.push_back(event);
     }
 
     vector<string> subscriptionIds;
     EXPECT_CALL(*mockClient, send(HasSubstr("REQ"), _, _))
         .Times(2)
-        .WillOnce(Invoke([&testEvents, &signer, &subscriptionIds](
+        .WillOnce(Invoke([&testEvents, &subscriptionIds](
             string message,
             string uri,
             function<void(const string&)> messageHandler)
@@ -972,8 +935,7 @@ TEST_F(NostrServiceTest, Service_MaintainsMultipleSubscriptions_ThenClosesAll)
 
             for (auto event : testEvents)
             {
-                auto sendableEvent = make_shared<nostr::Event>(event);
-                signer->sign(sendableEvent);
+                auto sendableEvent = make_shared<nostr::data::Event>(event);
                 json jarr = json::array({ "EVENT", subscriptionIds.at(0), sendableEvent->serialize() });
                 messageHandler(jarr.dump());
             }
@@ -983,7 +945,7 @@ TEST_F(NostrServiceTest, Service_MaintainsMultipleSubscriptions_ThenClosesAll)
 
             return make_tuple(uri, true);
         }))
-        .WillOnce(Invoke([&testEvents, &signer, &subscriptionIds](
+        .WillOnce(Invoke([&testEvents, &subscriptionIds](
             string message,
             string uri,
             function<void(const string&)> messageHandler)
@@ -993,8 +955,7 @@ TEST_F(NostrServiceTest, Service_MaintainsMultipleSubscriptions_ThenClosesAll)
 
             for (auto event : testEvents)
             {
-                auto sendableEvent = make_shared<nostr::Event>(event);
-                signer->sign(sendableEvent);
+                auto sendableEvent = make_shared<nostr::data::Event>(event);
                 json jarr = json::array({ "EVENT", subscriptionIds.at(1), sendableEvent->serialize() });
                 messageHandler(jarr.dump());
             }
@@ -1006,8 +967,8 @@ TEST_F(NostrServiceTest, Service_MaintainsMultipleSubscriptions_ThenClosesAll)
         }));
 
     // Send queries.
-    auto shortFormFilters = make_shared<nostr::Filters>(getKind0And1TestFilters());
-    auto longFormFilters = make_shared<nostr::Filters>(getKind30023TestFilters());
+    auto shortFormFilters = make_shared<nostr::data::Filters>(getKind0And1TestFilters());
+    auto longFormFilters = make_shared<nostr::data::Filters>(getKind30023TestFilters());
     promise<void> shortFormPromise;
     promise<void> longFormPromise;
     auto shortFormFuture = shortFormPromise.get_future();
@@ -1015,18 +976,18 @@ TEST_F(NostrServiceTest, Service_MaintainsMultipleSubscriptions_ThenClosesAll)
 
     string shortFormSubscriptionId = nostrService->queryRelays(
         shortFormFilters,
-        [&shortFormSubscriptionId, &signedTestEvents](const string& subscriptionId, shared_ptr<nostr::Event> event)
+        [&shortFormSubscriptionId, &sendableTestEvents](const string& subscriptionId, shared_ptr<nostr::data::Event> event)
         {
             ASSERT_STREQ(subscriptionId.c_str(), shortFormSubscriptionId.c_str());
             ASSERT_NE(
                 find_if(
-                    signedTestEvents.begin(),
-                    signedTestEvents.end(),
-                    [&event](shared_ptr<nostr::Event> testEvent)
+                    sendableTestEvents.begin(),
+                    sendableTestEvents.end(),
+                    [&event](shared_ptr<nostr::data::Event> testEvent)
                     {
                         return *testEvent == *event;
                     }),
-                signedTestEvents.end());
+                sendableTestEvents.end());
         },
         [&shortFormSubscriptionId, &shortFormPromise]
         (const string& subscriptionId)
@@ -1037,18 +998,18 @@ TEST_F(NostrServiceTest, Service_MaintainsMultipleSubscriptions_ThenClosesAll)
         [](const string&, const string&) {});
     string longFormSubscriptionId = nostrService->queryRelays(
         shortFormFilters,
-        [&longFormSubscriptionId, &signedTestEvents](const string& subscriptionId, shared_ptr<nostr::Event> event)
+        [&longFormSubscriptionId, &sendableTestEvents](const string& subscriptionId, shared_ptr<nostr::data::Event> event)
         {
             ASSERT_STREQ(subscriptionId.c_str(), longFormSubscriptionId.c_str());
             ASSERT_NE(
                 find_if(
-                    signedTestEvents.begin(),
-                    signedTestEvents.end(),
-                    [&event](shared_ptr<nostr::Event> testEvent)
+                    sendableTestEvents.begin(),
+                    sendableTestEvents.end(),
+                    [&event](shared_ptr<nostr::data::Event> testEvent)
                     {
                         return *testEvent == *event;
                     }),
-                signedTestEvents.end());
+                sendableTestEvents.end());
         },
         [&longFormSubscriptionId, &longFormPromise]
         (const string& subscriptionId)

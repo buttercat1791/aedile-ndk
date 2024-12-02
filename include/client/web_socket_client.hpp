@@ -3,9 +3,8 @@
 #include <functional>
 #include <string>
 
-#include <websocketpp/client.hpp>
-#include <websocketpp/config/asio_client.hpp>
-
+namespace nostr
+{
 namespace client
 {
 /**
@@ -14,6 +13,8 @@ namespace client
 class IWebSocketClient
 {
 public:
+    virtual ~IWebSocketClient() = default;
+
     /**
      * @brief Starts the client.
      * @remark This method must be called before any other client methods.
@@ -56,7 +57,8 @@ public:
     virtual std::tuple<std::string, bool> send(
         std::string message,
         std::string uri,
-        std::function<void(const std::string&)> messageHandler) = 0;
+        std::function<void(const std::string&)> messageHandler
+    ) = 0;
 
     /**
      * @brief Sets up a message handler for the given server.
@@ -64,7 +66,10 @@ public:
      * @param messageHandler A callable object that will be invoked with the payload the client
      * receives from the server.
      */
-    virtual void receive(std::string uri, std::function<void(const std::string&)> messageHandler) = 0;
+    virtual void receive(
+        std::string uri,
+        std::function<void(const std::string&)> messageHandler
+    ) = 0;
 
     /**
      * @brief Closes the connection to the given server.
@@ -72,3 +77,4 @@ public:
     virtual void closeConnection(std::string uri) = 0;
 };
 } // namespace client
+} // namespace nostr

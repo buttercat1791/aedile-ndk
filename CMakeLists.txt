@@ -4,7 +4,7 @@ if(CMAKE_VERSION VERSION_GREATER "3.24.0")
   # FIXME this policy isn't compatible with versions prior to 3.24
   cmake_policy(SET CMP0135 NEW)
 endif()
-project(aedile VERSION 0.0.2)
+project(aedile VERSION 0.0.3)
 
 include(ExternalProject)
 include(FetchContent)
@@ -12,7 +12,8 @@ include(FetchContent)
 # Specify the C++ standard
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
-SET(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -march=native")
+set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -march=native")
+set(CMAKE_POSITION_INDEPENDENT_CODE ON)
 
 get_directory_property(HAS_PARENT PARENT_DIRECTORY)
 if(HAS_PARENT)
@@ -46,65 +47,101 @@ find_package(websocketpp CONFIG REQUIRED)
 
 FetchContent_Declare(
     uuid_v4
-    GIT_REPOSITORY git@github.com:crashoz/uuid_v4.git
+    GIT_REPOSITORY https://github.com/crashoz/uuid_v4.git
     GIT_TAG v1.0.0
 )
-FetchContent_MakeAvailable(uuid_v4)
+FetchContent_Populate(uuid_v4)
+
+FetchContent_GetProperties(uuid_v4)
+include_directories(${uuid_v4_SOURCE_DIR})
+
+#======== Configure noscrypt ========#
+set(CRYPTO_LIB openssl)
+set(NC_ENABLE_UTILS ON)
+
+FetchContent_Declare(
+    libnoscrypt
+    GIT_REPOSITORY https://github.com/VnUgE/noscrypt.git
+    GIT_TAG v0.1.5
+)
+FetchContent_MakeAvailable(libnoscrypt)
+FetchContent_GetProperties(libnoscrypt)
 
 #======== Build the project ========#
-list(APPEND INCLUDE_DIR ./include)
-list(APPEND INCLUDE_DIR ./include/client)
-list(APPEND INCLUDE_DIR ${CMAKE_SOURCE_DIR}/build/linux/_deps/uuid_v4-src/)
-
-set(SOURCE_DIR ./src)
-set(CLIENT_SOURCE_DIR ./src/client)
-set(SOURCES
-    ${SOURCE_DIR}/event.cpp
-    ${SOURCE_DIR}/filters.cpp
-    ${SOURCE_DIR}/nostr_service.cpp
-    ${CLIENT_SOURCE_DIR}/websocketpp_client.cpp
+set(AEDILE_HEADERS
+    "include/nostr.hpp"
+    "include/client/web_socket_client.hpp"
+    "include/client/websocketpp_client.hpp"
+    "include/data/data.hpp"
+    "include/service/nostr_service_base.hpp"
+    "include/service/nostr_service.hpp"
+    "include/service/nostr_service_specializations.hpp"
+    "include/signer/signer.hpp"
+    "include/signer/noscrypt_signer.hpp"
+    "src/cryptography/noscrypt_cipher.hpp"
+    "src/cryptography/nostr_secure_rng.hpp"
+    "src/internal/noscrypt_logger.hpp"
 )
 
-add_library(aedile ${SOURCES})
+set(AEDILE_SOURCES
+    "src/client/websocketpp_client.cpp"
+    "src/cryptography/noscrypt_cipher.cpp"
+    "src/cryptography/nostr_secure_rng.cpp"
+    "src/data/event.cpp"
+    "src/data/filters.cpp"
+    "src/internal/noscrypt_logger.cpp"
+    "src/service/nostr_service_base.cpp"
+    "src/signer/noscrypt_signer.cpp"
+)
+
+add_library(aedile ${AEDILE_SOURCES} ${AEDILE_HEADERS})
 target_link_libraries(aedile PRIVATE
     nlohmann_json::nlohmann_json
     OpenSSL::SSL
     OpenSSL::Crypto
     plog::plog
     websocketpp::websocketpp
+    noscrypt
 )
-target_include_directories(aedile PUBLIC ${INCLUDE_DIR})
+target_include_directories(aedile PRIVATE include)
+target_include_directories(aedile PRIVATE ${libnoscrypt_SOURCE_DIR}/include)
 set_target_properties(aedile PROPERTIES WINDOWS_EXPORT_ALL_SYMBOLS YES)
 
 #======== Build the tests ========#
-enable_testing()
-include(GoogleTest)
+if(AEDILE_INCLUDE_TESTS)
+    message(STATUS "Building unit tests.")
 
-FetchContent_Declare(
-  googletest
-  URL https://github.com/google/googletest/archive/03597a01ee50ed33e9dfd640b249b4be3799d395.zip
-)
+    enable_testing()
+    include(GoogleTest)
 
-set(gtest_force_shared_crt ON CACHE BOOL "" FORCE)
-FetchContent_MakeAvailable(googletest)
+    FetchContent_Declare(
+        googletest
+        URL https://github.com/google/googletest/archive/03597a01ee50ed33e9dfd640b249b4be3799d395.zip
+    )
 
-enable_testing()
+    set(gtest_force_shared_crt ON CACHE BOOL "" FORCE)
+    FetchContent_MakeAvailable(googletest)
 
-set(TEST_DIR ./test)
-set(TEST_SOURCES
-    ${TEST_DIR}/nostr_service_test.cpp
-)
+    enable_testing()
 
-add_executable(aedile_test ${TEST_SOURCES} ${HEADERS})
-target_link_libraries(aedile_test PRIVATE
-    GTest::gmock
-    GTest::gtest
-    GTest::gtest_main
-    aedile
-    plog::plog
-    websocketpp::websocketpp
-)
-target_include_directories(aedile_test PUBLIC ${INCLUDE_DIR})
-set_target_properties(aedile_test PROPERTIES WINDOWS_EXPORT_ALL_SYMBOLS YES)
+    set(TEST_DIR ./test)
+    set(TEST_SOURCES
+        "test/nostr_event_test.cpp"
+        "test/nostr_service_base_test.cpp"
+    )
 
-gtest_add_tests(TARGET aedile_test)
+    add_executable(aedile_test ${TEST_SOURCES})
+    target_link_libraries(aedile_test PRIVATE
+        GTest::gmock
+        GTest::gtest
+        GTest::gtest_main
+        aedile
+        nlohmann_json::nlohmann_json
+    )
+    target_include_directories(aedile_test PRIVATE include)
+    target_include_directories(aedile_test PRIVATE src)
+    target_include_directories(aedile_test PRIVATE ${libnoscrypt_SOURCE_DIR}/include)
+    set_target_properties(aedile_test PROPERTIES WINDOWS_EXPORT_ALL_SYMBOLS YES)
+
+    gtest_add_tests(TARGET aedile_test)
+endif()
