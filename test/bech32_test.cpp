@@ -13,7 +13,7 @@ class Bech32Test: public testing::Test {
 
 TEST_F(Bech32Test, TestCompilation) {
     auto encoder = nostr::Bech32();
-    encoder.hello_world();
+    encoder.encode("npub", "stufff");
 }
 }
 
