@@ -109,3 +109,21 @@ target_include_directories(aedile_test PUBLIC ${INCLUDE_DIR})
 set_target_properties(aedile_test PROPERTIES WINDOWS_EXPORT_ALL_SYMBOLS YES)
 
 gtest_add_tests(TARGET aedile_test)
+
+
+set(BECH32_TEST_SOURCES
+    ${TEST_DIR}/bech32_test.cpp
+)
+
+add_executable(bech32_test ${BECH32_TEST_SOURCES} ${HEADERS})
+target_link_libraries(bech32_test PRIVATE
+    GTest::gtest
+    GTest::gtest_main
+    aedile
+    plog::plog
+    websocketpp::websocketpp
+)
+target_include_directories(bech32_test PUBLIC ${INCLUDE_DIR})
+set_target_properties(bech32_test PROPERTIES WINDOWS_EXPORT_ALL_SYMBOLS YES)
+
+gtest_add_tests(TARGET bech32_test)

@@ -345,13 +345,10 @@ public:
 
 class IBech32
 {
-    virtual void encode(char*, uint8_t*) = 0;
-    virtual void encode(char*, char*) = 0;
+    virtual void encode(uint8_t*, uint8_t*) = 0;
     virtual void encode(std::string, std::string) = 0;
-    virtual void encode(std::string, std::vector<uint8_t>) = 0;
 
     virtual void decode(char*) = 0;
     virtual void decode(std::string) = 0;
 };
-
 } // namespace nostr
